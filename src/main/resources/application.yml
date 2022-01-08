@@ -1,0 +1,18 @@
+# Server config
+server:
+  port: 8082
+
+# Spring Config
+spring:
+  data:
+    mongodb:
+      database: ProjectOne
+      host: localhost
+  application:
+    name: passive-operations-service
+
+# Constants
+constants:
+  eureka:
+    service_url:
+      customer_info_service: http://customer-info-service
