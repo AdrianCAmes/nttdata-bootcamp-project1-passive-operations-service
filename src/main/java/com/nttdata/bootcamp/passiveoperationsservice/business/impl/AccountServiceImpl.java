@@ -40,68 +40,24 @@ public class AccountServiceImpl implements AccountService {
     public Mono<Account> create(AccountCreateRequestDTO accountDTO) {
         log.info("Start of operation to create an account");
 
-        log.info("Validating customer existence");
         if (accountDTO.getCustomerId() == null || !accountDTO.getCustomerId().isBlank()) {
             Mono<Account> createdAccount = findByIdCustomerService(accountDTO.getCustomerId())
                     .flatMap(retrievedCustomer -> {
-                        log.info("Customer existence successfully validated");
+                        log.info("Validating account");
+                        return accountToCreateValidation(accountDTO, retrievedCustomer);
+                    })
+                    .flatMap(validatedCustomer -> {
+                        Account accountToCreate = accountUtils.accountCreateRequestDTOToAccount(accountDTO);
+                        Customer customer = customerUtils.customerCustomerServiceDTOToCustomer(validatedCustomer);
 
-                        log.info("Checking customer's status");
-                        if (retrievedCustomer.getStatus().contentEquals(constants.getSTATUS_BLOCKED()))
-                        {
-                            log.warn("Customer have blocked status");
-                            log.warn("Proceeding to abort create account");
-                            return Mono.error(new ElementBlockedException("The customer have blocked status"));
-                        }
+                        accountToCreate.setCustomer(customer);
+                        accountToCreate.setStatus(constants.getSTATUS_ACTIVE());
+                        accountToCreate.setCurrentBalance(0.0);
 
-                        Account account = accountUtils.accountCreateRequestDTOToAccount(accountDTO);
-                        Customer customer = customerUtils.customerCustomerServiceDTOToCustomer(retrievedCustomer);
-
-                        account.setCustomer(customer);
-                        account.setStatus(constants.getSTATUS_ACTIVE());
-                        account.setCurrentBalance(0.0);
-
-                        log.info("Checking the new account's holders");
-                        if (account.getHolders() == null || account.getHolders().isEmpty()) {
-                            log.warn("Account does not contain holders, must have at least one");
-                            log.warn("Proceeding to abort create account");
-                            return Mono.error(new IllegalArgumentException("Account does not contain holders"));
-                        }
-
-                        if (customer.getType().contentEquals(constants.getCUSTOMER_PERSONAL_TYPE()))
-                        {
-                            log.info("Checking customer's accounts");
-                            return findByCustomerId(customer.getId())
-                                    .filter(retrievedAccount -> retrievedAccount.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
-                                    .hasElements()
-                                    .flatMap(haveAnAccount -> {
-                                        if (haveAnAccount) {
-                                            log.warn("Can not create more than one account for a personal customer");
-                                            log.warn("Proceeding to abort create account");
-                                            return Mono.error(new BusinessLogicException("Customer have more than one account"));
-                                        }
-                                        else {
-                                            log.info("Creating new account: [{}]", account.toString());
-                                            return accountRepository.insert(account);
-                                        }
-                                    });
-                        } else if (customer.getType().contentEquals(constants.getCUSTOMER_BUSINESS_TYPE())) {
-                            log.info("Checking the new account's type");
-                            if (account.getAccountType().getDescription().contentEquals(constants.getACCOUNT_CURRENT_TYPE()))
-                            {
-                                log.info("Creating new account: [{}]", account.toString());
-                                return accountRepository.insert(account);
-                            } else {
-                                log.warn("Can not create {} account for business customers. Accounts must be of current type", account.getAccountType().getDescription());
-                                log.warn("Proceeding to abort create account");
-                                return Mono.error(new BusinessLogicException("Account is not of current type"));
-                            }
-                        } else {
-                            log.warn("Customer's type is not supported");
-                            log.warn("Proceeding to abort create account");
-                            return Mono.error(new BusinessLogicException("Not supported customer type"));
-                        }
-                    }).switchIfEmpty(Mono.error(new NoSuchElementException("Customer does not exist")));
+                        log.info("Creating new account: [{}]", accountToCreate.toString());
+                        return accountRepository.insert(accountToCreate);
+                    })
+                    .switchIfEmpty(Mono.error(new NoSuchElementException("Customer does not exist")));
 
             log.info("End of operation to create an account");
             return createdAccount;
@@ -140,26 +96,13 @@ public class AccountServiceImpl implements AccountService {
     public Mono<Account> update(AccountUpdateRequestDTO accountDTO) {
         log.info("Start of operation to update an account");
 
-        log.info("Validating account existence");
         Mono<Account> updatedAccount = findById(accountDTO.getId())
                 .flatMap(retrievedAccount -> {
-                    log.info("Customer existence successfully validated");
-
-                    log.info("Checking customer's status");
-                    if (retrievedAccount.getCustomer().getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
-                        log.warn("Customer have blocked status");
-                        log.warn("Proceeding to abort update account");
-                        return Mono.error(new ElementBlockedException("The customer have blocked status"));
-                    }
-
-                    log.info("Checking the new account's holders");
-                    if (accountDTO.getHolders() == null || accountDTO.getHolders().isEmpty()) {
-                        log.warn("Account does not contain holders, must have at least one");
-                        log.warn("Proceeding to abort update account");
-                        return Mono.error(new IllegalArgumentException("Account does not contain holders"));
-                    }
-
-                    Account accountToUpdate = accountUtils.fillAccountWithAccountUpdateCreateRequestDTO(retrievedAccount, accountDTO);
+                    log.info("Validating account");
+                    return accountToUpdateValidation(accountDTO, retrievedAccount);
+                })
+                .flatMap(validatedAccount -> {
+                    Account accountToUpdate = accountUtils.fillAccountWithAccountUpdateCreateRequestDTO(validatedAccount, accountDTO);
 
                     log.info("Updating customer: [{}]", accountToUpdate.toString());
                     Mono<Account> nestedUpdatedAccount = accountRepository.save(accountToUpdate);
@@ -221,36 +164,20 @@ public class AccountServiceImpl implements AccountService {
     public Mono<Account> doOperation(AccountDoOperationRequestDTO accountDTO) {
         log.info("Start to save a new account operation for the account with id: [{}]", accountDTO.getId());
 
-        log.info("Validating account existence");
         Mono<Account> updatedAccount = accountRepository.findById(accountDTO.getId())
                         .flatMap(retrievedAccount -> {
-                            log.info("Customer existence successfully validated");
+                            log.info("Validating operation");
+                            return operationValidation(accountDTO, retrievedAccount);
+                        })
+                        .flatMap(validatedAccount -> {
+                            Double amountToUpdate = accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_DEPOSIT_TYPE()) ?
+                                    validatedAccount.getCurrentBalance() + accountDTO.getOperation().getAmount() :
+                                    validatedAccount.getCurrentBalance() - accountDTO.getOperation().getAmount();
+                            validatedAccount.setCurrentBalance(amountToUpdate);
 
-                            log.info("Checking account's status");
-                            if (retrievedAccount.getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
-                                log.warn("Account have blocked status");
-                                log.warn("Proceeding to abort do operation");
-                                return Mono.error(new ElementBlockedException("The account have blocked status"));
-                            }
+                            Account accountToUpdate = accountUtils.fillAccountWithAccountDoOperationRequestDTO(validatedAccount, accountDTO);
 
-                            Account accountToUpdate = accountUtils.fillAccountWithAccountDoOperationRequestDTO(retrievedAccount, accountDTO);
-
-                            if (accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_DEPOSIT_TYPE())) {
-                                Double amountToUpdate = accountToUpdate.getCurrentBalance() + accountDTO.getOperation().getAmount();
-                                log.info("Doing deposit of [{}] to account with id [{}]", accountDTO.getOperation().getAmount(), accountDTO.getId());
-                                accountToUpdate.setCurrentBalance(amountToUpdate);
-                            } else if (accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_WITHDRAWAL_TYPE())) {
-                                Double amountToUpdate = accountToUpdate.getCurrentBalance() - accountDTO.getOperation().getAmount();
-                                if (amountToUpdate < 0) {
-                                    log.info("Account has insufficient funds");
-                                    log.warn("Proceeding to abort do operation");
-                                    return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
-                                } else {
-                                    log.info("Doing withdrawal of [{}] to account with id [{}]", accountDTO.getOperation().getAmount(), accountDTO.getId());
-                                    accountToUpdate.setCurrentBalance(amountToUpdate);
-                                }
-                            }
-
+                            log.info("Doing deposit of [{}] to account with id [{}]", accountDTO.getOperation().getAmount(), accountDTO.getId());
                             log.info("Saving operation into account: [{}]", accountToUpdate.toString());
                             Mono<Account> nestedUpdatedAccount = accountRepository.save(accountToUpdate);
                             log.info("Operation was successfully updated");
@@ -280,11 +207,106 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     public Flux<AccountFindBalancesResponseDTO> findBalancesByCustomerId(String id) {
+        log.info("Start of operation to retrieve account balances from customer with id: [{}]", id);
+
+        log.info("Retrieving account balances");
         Flux<AccountFindBalancesResponseDTO> retrievedBalances = findByCustomerId(id)
                 .map(retrievedAccount -> accountUtils.accountToAccountFindBalancesResponseDTO(retrievedAccount));
+        log.info("Balances retrieved successfully");
 
+        log.info("End of operation to retrieve account balances from customer with id: [{}]", id);
         return retrievedBalances;
     }
 
+    //region Private Helper Functions
 
+    private Mono<CustomerCustomerServiceResponseDTO> accountToCreateValidation(AccountCreateRequestDTO accountToCreate, CustomerCustomerServiceResponseDTO customerFromMicroservice) {
+        log.info("Customer exists in database");
+
+        if (customerFromMicroservice.getStatus().contentEquals(constants.getSTATUS_BLOCKED()))
+        {
+            log.warn("Customer have blocked status");
+            log.warn("Proceeding to abort create account");
+            return Mono.error(new ElementBlockedException("The customer have blocked status"));
+        }
+
+
+        if (accountToCreate.getHolders() == null || accountToCreate.getHolders().isEmpty()) {
+            log.warn("Account does not contain holders, must have at least one");
+            log.warn("Proceeding to abort create account");
+            return Mono.error(new IllegalArgumentException("Account does not contain holders"));
+        }
+
+        if (customerFromMicroservice.getType().contentEquals(constants.getCUSTOMER_PERSONAL_TYPE()))
+        {
+            return findByCustomerId(customerFromMicroservice.getId())
+                    .filter(retrievedAccount -> retrievedAccount.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
+                    .hasElements()
+                    .flatMap(haveAnAccount -> {
+                        if (haveAnAccount) {
+                            log.warn("Can not create more than one account for a personal customer");
+                            log.warn("Proceeding to abort create account");
+                            return Mono.error(new BusinessLogicException("Customer have more than one account"));
+                        }
+                        else {
+                            log.info("Account successfully validated");
+                            return Mono.just(customerFromMicroservice);
+                        }
+                    });
+        } else if (customerFromMicroservice.getType().contentEquals(constants.getCUSTOMER_BUSINESS_TYPE())) {
+            if (accountToCreate.getAccountType().getDescription().contentEquals(constants.getACCOUNT_CURRENT_TYPE()))
+            {
+                log.info("Account successfully validated");
+                return Mono.just(customerFromMicroservice);
+            } else {
+                log.warn("Can not create {} account for business customers. Accounts must be of current type", accountToCreate.getAccountType().getDescription());
+                log.warn("Proceeding to abort create account");
+                return Mono.error(new BusinessLogicException("Account is not of current type"));
+            }
+        } else {
+            log.warn("Customer's type is not supported");
+            log.warn("Proceeding to abort create account");
+            return Mono.error(new BusinessLogicException("Not supported customer type"));
+        }
+    }
+
+    private Mono<Account> accountToUpdateValidation(AccountUpdateRequestDTO accountForUpdate, Account accountInDatabase) {
+        log.info("Account exists in database");
+
+        if (accountInDatabase.getCustomer().getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
+            log.warn("Customer have blocked status");
+            log.warn("Proceeding to abort update account");
+            return Mono.error(new ElementBlockedException("The customer have blocked status"));
+        }
+
+        if (accountForUpdate.getHolders() == null || accountForUpdate.getHolders().isEmpty()) {
+            log.warn("Account does not contain holders, must have at least one");
+            log.warn("Proceeding to abort update account");
+            return Mono.error(new IllegalArgumentException("Account does not contain holders"));
+        }
+
+        log.info("Account successfully validated");
+        return Mono.just(accountInDatabase);
+    }
+
+    private Mono<Account> operationValidation(AccountDoOperationRequestDTO accountToUpdateOperation, Account accountInDatabase) {
+        log.info("Account exists in database");
+
+        if (accountInDatabase.getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
+            log.warn("Account have blocked status");
+            log.warn("Proceeding to abort do operation");
+            return Mono.error(new ElementBlockedException("The account have blocked status"));
+        }
+
+        if (accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOPERATION_WITHDRAWAL_TYPE()) &&
+            accountInDatabase.getCurrentBalance() < accountToUpdateOperation.getOperation().getAmount()) {
+            log.info("Account has insufficient funds");
+            log.warn("Proceeding to abort do operation");
+            return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
+        }
+
+        log.info("Operation successfully validated");
+        return Mono.just(accountInDatabase);
+    }
+    //endregion
 }
