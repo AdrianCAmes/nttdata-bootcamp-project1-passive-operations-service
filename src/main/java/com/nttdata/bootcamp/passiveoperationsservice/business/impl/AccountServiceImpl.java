@@ -4,6 +4,7 @@ import com.nttdata.bootcamp.passiveoperationsservice.business.AccountService;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Customer;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.repository.AccountRepository;
@@ -38,7 +39,7 @@ public class AccountServiceImpl implements AccountService {
         log.info("Start of operation to create an account");
 
         log.info("Validating customer existence");
-        if (!accountDTO.getCustomerId().isBlank()) {
+        if (accountDTO.getCustomerId() == null || !accountDTO.getCustomerId().isBlank()) {
             Mono<Account> createdAccount = findByIdCustomerService(accountDTO.getCustomerId())
                     .flatMap(retrievedCustomer -> {
                         log.info("Customer existence successfully validated");
@@ -146,7 +147,7 @@ public class AccountServiceImpl implements AccountService {
                     if (retrievedAccount.getCustomer().getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
                         log.warn("Customer have blocked status");
                         log.warn("Proceeding to abort update account");
-                        return Mono.error(new ElementBlockedException("The account have blocked status"));
+                        return Mono.error(new ElementBlockedException("The customer have blocked status"));
                     }
 
                     log.info("Checking the new account's holders");
@@ -213,4 +214,52 @@ public class AccountServiceImpl implements AccountService {
         log.info("End of operation to retrieve accounts of the customer with id: [{}]", id);
         return retrievedAccount;
     }
+
+    @Override
+    public Mono<Account> doOperation(AccountDoOperationRequestDTO accountDTO) {
+        log.info("Start to save a new account operation for the account with id: [{}]", accountDTO.getId());
+
+        log.info("Validating account existence");
+        Mono<Account> updatedAccount = accountRepository.findById(accountDTO.getId())
+                        .flatMap(retrievedAccount -> {
+                            log.info("Customer existence successfully validated");
+
+                            log.info("Checking account's status");
+                            if (retrievedAccount.getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
+                                log.warn("Account have blocked status");
+                                log.warn("Proceeding to abort do operation");
+                                return Mono.error(new ElementBlockedException("The account have blocked status"));
+                            }
+
+                            Account accountToUpdate = accountUtils.fillAccountWithAccountDoOperationRequestDTO(retrievedAccount, accountDTO);
+
+                            if (accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_DEPOSIT_TYPE())) {
+                                Double amountToUpdate = accountToUpdate.getCurrentBalance() + accountDTO.getOperation().getAmount();
+                                log.info("Doing deposit of [{}] to account with id [{}]", accountDTO.getOperation().getAmount(), accountDTO.getId());
+                                accountToUpdate.setCurrentBalance(amountToUpdate);
+                            } else if (accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_WITHDRAWAL_TYPE())) {
+                                Double amountToUpdate = accountToUpdate.getCurrentBalance() - accountDTO.getOperation().getAmount();
+                                if (amountToUpdate < 0) {
+                                    log.info("Account has insufficient funds");
+                                    log.warn("Proceeding to abort do operation");
+                                    return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
+                                } else {
+                                    log.info("Doing withdrawal of [{}] to account with id [{}]", accountDTO.getOperation().getAmount(), accountDTO.getId());
+                                    accountToUpdate.setCurrentBalance(amountToUpdate);
+                                }
+                            }
+
+                            log.info("Saving operation into account: [{}]", accountToUpdate.toString());
+                            Mono<Account> nestedUpdatedAccount = accountRepository.save(accountToUpdate);
+                            log.info("Operation was successfully updated");
+
+                            return nestedUpdatedAccount;
+                        })
+                        .switchIfEmpty(Mono.error(new NoSuchElementException("Account does not exist")));
+
+        log.info("End to save a new account operation for the account with id: [{}]", accountDTO.getId());
+        return updatedAccount;
+    }
+
+
 }

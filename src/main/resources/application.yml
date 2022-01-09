@@ -30,6 +30,9 @@ constants:
   customer:
     personal_type: Personal
     business_type: Business
+  operation:
+    deposit_type: Deposit
+    withdrawal_type: Withdrawal
   eureka:
     service_url:
       customer_info_service: localhost:8081/api/v1
