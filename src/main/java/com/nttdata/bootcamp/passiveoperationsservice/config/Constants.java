@@ -30,4 +30,10 @@ public class Constants {
 
     @Value("${constants.status.active}")
     private String STATUS_ACTIVE;
+
+    @Value("${constants.operation.deposit_type}")
+    private String OPERATION_DEPOSIT_TYPE;
+
+    @Value("${constants.operation.withdrawal_type}")
+    private String OPERATION_WITHDRAWAL_TYPE;
 }

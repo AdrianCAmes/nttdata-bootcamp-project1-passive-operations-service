@@ -7,7 +7,6 @@ import org.springframework.data.mongodb.repository.config.EnableReactiveMongoRep
 
 @SpringBootApplication
 @EnableReactiveMongoRepositories
-@EnableDiscoveryClient
 public class PassiveOperationsServiceApplication {
 
 	public static void main(String[] args) {

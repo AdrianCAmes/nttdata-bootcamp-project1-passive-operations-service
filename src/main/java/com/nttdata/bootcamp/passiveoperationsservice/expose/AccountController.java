@@ -3,6 +3,7 @@ package com.nttdata.bootcamp.passiveoperationsservice.expose;
 import com.nttdata.bootcamp.passiveoperationsservice.business.AccountService;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.BusinessLogicException;
@@ -76,4 +77,15 @@ public class AccountController {
                 .flatMap(retrievedCustomer -> Mono.just(ResponseEntity.ok(retrievedCustomer)))
                 .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
      }
+
+    @PostMapping("/accounts/operations")
+    public Mono<ResponseEntity<Account>> doOperation(@RequestBody AccountDoOperationRequestDTO accountDTO) {
+        log.info("Post operation in /accounts/operation");
+        return accountService.doOperation(accountDTO)
+                .flatMap(createdAccount -> Mono.just(ResponseEntity.status(HttpStatus.CREATED).body(createdAccount)))
+                .onErrorResume(ElementBlockedException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.LOCKED).build()))
+                .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
+                .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
+                .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
+    }
 }

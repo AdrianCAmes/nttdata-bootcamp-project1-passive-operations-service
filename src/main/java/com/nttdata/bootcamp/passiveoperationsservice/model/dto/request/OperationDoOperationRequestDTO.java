@@ -1,4 +1,4 @@
-package com.nttdata.bootcamp.passiveoperationsservice.model;
+package com.nttdata.bootcamp.passiveoperationsservice.model.dto.request;
 
 import lombok.*;
 
@@ -11,9 +11,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @ToString
-public class Operation {
-    private String operationNumber = UUID.randomUUID().toString();
-    private Date time;
+public class OperationDoOperationRequestDTO {
     private String type;
     private Double amount;
 }

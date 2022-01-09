@@ -2,6 +2,7 @@ package com.nttdata.bootcamp.passiveoperationsservice.business;
 
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import reactor.core.publisher.Flux;
@@ -15,4 +16,5 @@ public interface AccountService {
     Mono<Account> removeById(String id);
     Mono<CustomerCustomerServiceResponseDTO> findByIdCustomerService(String id);
     Flux<Account> findByCustomerId(String id);
+    Mono<Account> doOperation(AccountDoOperationRequestDTO accountDTO);
 }
