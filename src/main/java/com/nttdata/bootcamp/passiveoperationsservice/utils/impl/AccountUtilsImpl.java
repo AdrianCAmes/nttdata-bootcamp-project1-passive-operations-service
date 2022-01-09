@@ -1,11 +1,13 @@
 package com.nttdata.bootcamp.passiveoperationsservice.utils.impl;
 
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
+import com.nttdata.bootcamp.passiveoperationsservice.model.AccountType;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Customer;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.OperationUtils;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +58,15 @@ public class AccountUtilsImpl implements AccountUtils {
                 .build();
     }
 
+    @Override
+    public Account accountFindBalancesResponseDTOToAccount(AccountFindBalancesResponseDTO accountDTO) {
+        return Account.builder()
+                .id(accountDTO.getId())
+                .currentBalance(accountDTO.getCurrentBalance())
+                .accountType(AccountType.builder().description(accountDTO.getAccountType()).build())
+                .build();
+    }
+
     public AccountCreateRequestDTO accountToAccountCreateRequestDTO(Account account) {
         return AccountCreateRequestDTO.builder()
                 .customerId(account.getCustomer().getId())
@@ -83,6 +94,15 @@ public class AccountUtilsImpl implements AccountUtils {
         return AccountDoOperationRequestDTO.builder()
                 .id(account.getId())
                 .operation(operationUtils.operationToOperationDoOperationRequestDTO(account.getOperations().get(0)))
+                .build();
+    }
+
+    @Override
+    public AccountFindBalancesResponseDTO accountToAccountFindBalancesResponseDTO(Account account) {
+        return AccountFindBalancesResponseDTO.builder()
+                .id(account.getId())
+                .currentBalance(account.getCurrentBalance())
+                .accountType(account.getAccountType().getDescription())
                 .build();
     }
 

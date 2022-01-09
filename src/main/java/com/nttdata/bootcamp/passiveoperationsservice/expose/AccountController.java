@@ -3,6 +3,7 @@ package com.nttdata.bootcamp.passiveoperationsservice.expose;
 import com.nttdata.bootcamp.passiveoperationsservice.business.AccountService;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
@@ -93,9 +94,12 @@ public class AccountController {
     @GetMapping("/accounts/{id}/operations")
     public Flux<Operation> findOperationsByAccountId(@PathVariable("id") String id) {
         log.info("Get operation in /accounts/{}/operations", id);
-        return accountService.findById(id)
-                .filter(retrievedCustomer -> (retrievedCustomer.getOperations() != null))
-                .flux()
-                .flatMap(retrievedCustomer -> Flux.fromIterable(retrievedCustomer.getOperations()));
+        return accountService.findOperationsByAccountId(id);
+    }
+
+    @GetMapping("customers/{id}/accounts/balance")
+    public Flux<AccountFindBalancesResponseDTO> findBalancesByCustomerId(@PathVariable("id") String id) {
+        log.info("Get operation in /customers/{}/accounts/balance", id);
+        return accountService.findBalancesByCustomerId(id);
     }
 }

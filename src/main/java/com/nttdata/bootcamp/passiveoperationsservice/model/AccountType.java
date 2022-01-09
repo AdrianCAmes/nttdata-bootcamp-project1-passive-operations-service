@@ -8,6 +8,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @ToString
 public class AccountType {
     private String id = UUID.randomUUID().toString();
