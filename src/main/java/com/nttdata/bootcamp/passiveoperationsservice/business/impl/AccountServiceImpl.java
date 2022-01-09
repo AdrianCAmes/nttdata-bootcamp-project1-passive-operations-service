@@ -3,9 +3,11 @@ package com.nttdata.bootcamp.passiveoperationsservice.business.impl;
 import com.nttdata.bootcamp.passiveoperationsservice.business.AccountService;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Customer;
+import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.repository.AccountRepository;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountUtils;
@@ -259,6 +261,29 @@ public class AccountServiceImpl implements AccountService {
 
         log.info("End to save a new account operation for the account with id: [{}]", accountDTO.getId());
         return updatedAccount;
+    }
+
+    @Override
+    public Flux<Operation> findOperationsByAccountId(String id) {
+        log.info("Start of operation to retrieve all operations from account with id: [{}]", id);
+
+        log.info("Retrieving all operations");
+        Flux<Operation> retrievedOperations = findById(id)
+                .filter(retrievedAccount -> retrievedAccount.getOperations() != null)
+                .flux()
+                .flatMap(retrievedAccount -> Flux.fromIterable(retrievedAccount.getOperations()));
+        log.info("Operations retrieved successfully");
+
+        log.info("End of operation to retrieve operations from account with id: [{}]", id);
+        return retrievedOperations;
+    }
+
+    @Override
+    public Flux<AccountFindBalancesResponseDTO> findBalancesByCustomerId(String id) {
+        Flux<AccountFindBalancesResponseDTO> retrievedBalances = findByCustomerId(id)
+                .map(retrievedAccount -> accountUtils.accountToAccountFindBalancesResponseDTO(retrievedAccount));
+
+        return retrievedBalances;
     }
 
 
