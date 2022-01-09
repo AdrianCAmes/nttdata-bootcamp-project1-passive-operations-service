@@ -12,10 +12,12 @@ import java.util.Date;
 @NoArgsConstructor
 @AllArgsConstructor
 @ToString
+@Builder
 @Document(collection = "accounts")
 public class Account {
     @Id
     private String id;
+    private String status;
     private Customer customer;
     private AccountType accountType;
     private String accountNumber;

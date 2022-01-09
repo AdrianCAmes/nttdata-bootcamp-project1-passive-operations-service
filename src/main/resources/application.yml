@@ -11,8 +11,26 @@ spring:
   application:
     name: passive-operations-service
 
+eureka:
+  instance:
+    hostname: localhost
+    serviceUrl:
+      defaultZone: http://${eureka.instance.hostname}:8761/eureka/
+    prefer-ip-address: true
+
 # Constants
 constants:
+  status:
+    blocked: Blocked
+    active: Active
+  account:
+    current_type: Current
+    savings_type: Savings
+    long_term_type:  Long term
+  customer:
+    personal_type: Personal
+    business_type: Business
   eureka:
     service_url:
-      customer_info_service: http://customer-info-service
+      customer_info_service: localhost:8081/api/v1
+      # customer_info_service: customer-info-service
