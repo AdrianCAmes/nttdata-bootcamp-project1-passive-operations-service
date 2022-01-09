@@ -2,6 +2,7 @@ package com.nttdata.bootcamp.passiveoperationsservice.expose;
 
 import com.nttdata.bootcamp.passiveoperationsservice.business.AccountService;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
+import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
@@ -87,5 +88,14 @@ public class AccountController {
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
+    }
+
+    @GetMapping("/accounts/{id}/operations")
+    public Flux<Operation> findOperationsByAccountId(@PathVariable("id") String id) {
+        log.info("Get operation in /accounts/{}/operations", id);
+        return accountService.findById(id)
+                .filter(retrievedCustomer -> (retrievedCustomer.getOperations() != null))
+                .flux()
+                .flatMap(retrievedCustomer -> Flux.fromIterable(retrievedCustomer.getOperations()));
     }
 }
