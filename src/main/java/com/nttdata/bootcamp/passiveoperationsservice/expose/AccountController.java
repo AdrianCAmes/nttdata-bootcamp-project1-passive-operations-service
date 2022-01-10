@@ -27,6 +27,7 @@ import java.util.NoSuchElementException;
 public class AccountController {
     private final AccountService accountService;
 
+    //region CRUD Endpoints
     @GetMapping("/accounts")
     public Flux<Account> findAllAccounts(){
         log.info("Get operation in /accounts");
@@ -37,7 +38,7 @@ public class AccountController {
     public Mono<ResponseEntity<Account>> findAccountById(@PathVariable("id") String id) {
         log.info("Get operation in /accounts/{}", id);
         return accountService.findById(id)
-                .flatMap(retrievedCustomer -> Mono.just(ResponseEntity.ok(retrievedCustomer)))
+                .flatMap(retrievedAccount -> Mono.just(ResponseEntity.ok(retrievedAccount)))
                 .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
     }
 
@@ -68,25 +69,37 @@ public class AccountController {
     public Mono<ResponseEntity<Account>> deleteAccount(@PathVariable("id") String id) {
         log.info("Delete operation in /accounts/{}", id);
         return accountService.removeById(id)
-                .flatMap(removedCustomer -> Mono.just(ResponseEntity.ok(removedCustomer)))
+                .flatMap(removedAccount -> Mono.just(ResponseEntity.ok(removedAccount)))
                 .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
     }
+    //endregion
 
-    @GetMapping("/customers-service/{id}")
-    public Mono<ResponseEntity<CustomerCustomerServiceResponseDTO>> findByIdCustomerService(@PathVariable("id") String id) {
-        log.info("Get operation in /customers-service/{}", id);
-        return accountService.findByIdCustomerService(id)
-                .flatMap(retrievedCustomer -> Mono.just(ResponseEntity.ok(retrievedCustomer)))
-                .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
-     }
+    //region Additional Repository Endpoints
+    @GetMapping("customers/{id}/accounts")
+    public Flux<Account> findAccountsByCustomerId(@PathVariable("id") String id) {
+        log.info("Get operation in /customers/{}/accounts", id);
+        return accountService.findByCustomerId(id);
+    }
+    //endregion
 
+    //region UseCases
     @PostMapping("/accounts/operations")
     public Mono<ResponseEntity<Account>> doOperation(@RequestBody AccountDoOperationRequestDTO accountDTO) {
         log.info("Post operation in /accounts/operation");
         return accountService.doOperation(accountDTO)
                 .flatMap(createdAccount -> Mono.just(ResponseEntity.status(HttpStatus.CREATED).body(createdAccount)))
                 .onErrorResume(ElementBlockedException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.LOCKED).build()))
+                .onErrorResume(BusinessLogicException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()))
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
+                .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
+                .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
+    }
+
+    @PutMapping("/accounts/{id}/reset-operations-number")
+    public Mono<ResponseEntity<Account>> resetDoneOperationsInMonth(@PathVariable("id") String id) {
+        log.info("Get operation in /accounts/{id}/reset-operations-number", id);
+        return accountService.resetDoneOperationsInMonth(id)
+                .flatMap(createdAccount -> Mono.just(ResponseEntity.status(HttpStatus.OK).body(createdAccount)))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
     }
@@ -102,4 +115,5 @@ public class AccountController {
         log.info("Get operation in /customers/{}/accounts/balance", id);
         return accountService.findBalancesByCustomerId(id);
     }
+    //endregion
 }

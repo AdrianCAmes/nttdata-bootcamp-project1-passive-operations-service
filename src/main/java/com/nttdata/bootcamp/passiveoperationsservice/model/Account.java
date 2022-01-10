@@ -24,6 +24,7 @@ public class Account {
     private Date issueDate;
     private Date dueDate;
     private Double currentBalance;
+    private Integer doneOperationsInMonth;
     private ArrayList<Operation> operations;
     private ArrayList<Person> holders;
     private ArrayList<Person> signers;

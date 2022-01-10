@@ -23,6 +23,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.Calendar;
 import java.util.NoSuchElementException;
 
 @Service
@@ -102,11 +103,11 @@ public class AccountServiceImpl implements AccountService {
                     return accountToUpdateValidation(accountDTO, retrievedAccount);
                 })
                 .flatMap(validatedAccount -> {
-                    Account accountToUpdate = accountUtils.fillAccountWithAccountUpdateCreateRequestDTO(validatedAccount, accountDTO);
+                    Account accountToUpdate = accountUtils.fillAccountWithAccountUpdateRequestDTO(validatedAccount, accountDTO);
 
-                    log.info("Updating customer: [{}]", accountToUpdate.toString());
+                    log.info("Updating account: [{}]", accountToUpdate.toString());
                     Mono<Account> nestedUpdatedAccount = accountRepository.save(accountToUpdate);
-                    log.info("Customer with id: [{}] was successfully updated", accountToUpdate.getId());
+                    log.info("Account with id: [{}] was successfully updated", accountToUpdate.getId());
 
                     return nestedUpdatedAccount;
                 })
@@ -123,7 +124,7 @@ public class AccountServiceImpl implements AccountService {
         log.info("Deleting account with id: [{}]", id);
         Mono<Account> removedAccount = findById(id)
                 .flatMap(retrievedAccount -> accountRepository.deleteById(retrievedAccount.getId()).thenReturn(retrievedAccount));
-        log.info("Customer with id: [{}] was successfully deleted", id);
+        log.info("Account with id: [{}] was successfully deleted", id);
 
         log.info("End of operation to remove a customer");
         return removedAccount;
@@ -174,6 +175,7 @@ public class AccountServiceImpl implements AccountService {
                                     validatedAccount.getCurrentBalance() + accountDTO.getOperation().getAmount() :
                                     validatedAccount.getCurrentBalance() - accountDTO.getOperation().getAmount();
                             validatedAccount.setCurrentBalance(amountToUpdate);
+                            validatedAccount.setDoneOperationsInMonth(validatedAccount.getDoneOperationsInMonth() == null ? 1 : validatedAccount.getDoneOperationsInMonth() + 1);
 
                             Account accountToUpdate = accountUtils.fillAccountWithAccountDoOperationRequestDTO(validatedAccount, accountDTO);
 
@@ -218,8 +220,27 @@ public class AccountServiceImpl implements AccountService {
         return retrievedBalances;
     }
 
-    //region Private Helper Functions
+    @Override
+    public Mono<Account> resetDoneOperationsInMonth(String id) {
+        log.info("Start to reset done operations in month");
 
+        Mono<Account> updatedAccount = findById(id)
+                .flatMap(retrievedAccount -> {
+                    retrievedAccount.setDoneOperationsInMonth(0);
+
+                    log.info("Resetting done operations in month for account wit id: [{}]", id);
+                    Mono<Account> nestedUpdatedAccount = accountRepository.save(retrievedAccount);
+                    log.info("Done operations in month successfully reseted for account with id: [{}]", id);
+
+                    return nestedUpdatedAccount;
+                })
+                .switchIfEmpty(Mono.error(new NoSuchElementException("Account does not exist")));
+
+        log.info("End to reset done operations in month");
+        return updatedAccount;
+    }
+
+    //region Private Helper Functions
     private Mono<CustomerCustomerServiceResponseDTO> accountToCreateValidation(AccountCreateRequestDTO accountToCreate, CustomerCustomerServiceResponseDTO customerFromMicroservice) {
         log.info("Customer exists in database");
 
@@ -303,6 +324,22 @@ public class AccountServiceImpl implements AccountService {
             log.info("Account has insufficient funds");
             log.warn("Proceeding to abort do operation");
             return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
+        }
+
+        if (accountInDatabase.getAccountType().getDescription().contentEquals(constants.getACCOUNT_LONG_TERM_TYPE()) &&
+            !accountInDatabase.getAccountType().getAllowedDayForOperations().equals(Calendar.getInstance().get(Calendar.DAY_OF_MONTH))) {
+            log.info("Allowed day [{}] for operations in this account does not match with current day of the month [{}]",
+                    accountInDatabase.getAccountType().getAllowedDayForOperations(),
+                    Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
+            log.warn("Proceeding to abort do operation");
+            return Mono.error(new BusinessLogicException("Allowed day for operations in this account does not match with current day of the month"));
+        }
+
+        if (accountInDatabase.getAccountType().getMaximumNumberOfOperations() != null &&
+            accountInDatabase.getAccountType().getMaximumNumberOfOperations().equals(accountInDatabase.getDoneOperationsInMonth())) {
+            log.info("Maximum number of operations reached, can not do more operations");
+            log.warn("Proceeding to abort do operation");
+            return Mono.error(new BusinessLogicException("Maximum number of operations reached, can not do more operations"));
         }
 
         log.info("Operation successfully validated");

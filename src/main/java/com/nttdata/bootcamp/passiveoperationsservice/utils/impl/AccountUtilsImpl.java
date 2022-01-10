@@ -43,6 +43,7 @@ public class AccountUtilsImpl implements AccountUtils {
                 .status(accountDTO.getStatus())
                 .dueDate(accountDTO.getDueDate())
                 .currentBalance(accountDTO.getCurrentBalance())
+                .doneOperationsInMonth(accountDTO.getDoneOperationsInMonth())
                 .operations(accountDTO.getOperations())
                 .holders(accountDTO.getHolders())
                 .signers(accountDTO.getSigners())
@@ -83,6 +84,7 @@ public class AccountUtilsImpl implements AccountUtils {
                 .id(account.getId())
                 .dueDate(account.getDueDate())
                 .currentBalance(account.getCurrentBalance())
+                .doneOperationsInMonth(account.getDoneOperationsInMonth())
                 .operations(account.getOperations())
                 .holders(account.getHolders())
                 .signers(account.getSigners())
@@ -106,11 +108,12 @@ public class AccountUtilsImpl implements AccountUtils {
                 .build();
     }
 
-    public Account fillAccountWithAccountUpdateCreateRequestDTO(Account account, AccountUpdateRequestDTO accountDTO) {
+    public Account fillAccountWithAccountUpdateRequestDTO(Account account, AccountUpdateRequestDTO accountDTO) {
         account.setId(accountDTO.getId());
         account.setStatus(accountDTO.getStatus());
         account.setDueDate(accountDTO.getDueDate());
         account.setCurrentBalance(accountDTO.getCurrentBalance());
+        account.setDoneOperationsInMonth(accountDTO.getDoneOperationsInMonth());
         account.setOperations(accountDTO.getOperations());
         account.setHolders(accountDTO.getHolders());
         account.setSigners(accountDTO.getSigners());
