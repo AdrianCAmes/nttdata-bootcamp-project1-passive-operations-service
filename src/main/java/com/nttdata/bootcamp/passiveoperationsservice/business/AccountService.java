@@ -21,4 +21,5 @@ public interface AccountService {
     Mono<Account> doOperation(AccountDoOperationRequestDTO accountDTO);
     Flux<Operation> findOperationsByAccountId(String id);
     Flux<AccountFindBalancesResponseDTO> findBalancesByCustomerId(String id);
+    Mono<Account> resetDoneOperationsInMonth(String id);
 }
