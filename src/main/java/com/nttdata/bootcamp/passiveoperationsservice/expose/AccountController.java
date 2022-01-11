@@ -80,6 +80,12 @@ public class AccountController {
         log.info("Get operation in /customers/{}/accounts", id);
         return accountService.findByCustomerId(id);
     }
+
+    @GetMapping("customers-service/{id}")
+    public Mono<CustomerCustomerServiceResponseDTO> findByIdCustomerService(@PathVariable("id") String id) {
+        log.info("Get operation in /customers-service/{}", id);
+        return accountService.findByIdCustomerService(id);
+    }
     //endregion
 
     //region UseCases
