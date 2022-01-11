@@ -135,9 +135,10 @@ public class AccountServiceImpl implements AccountService {
         log.info("Start of operation to retrieve customer with id [{}] from customer-info-service", id);
 
         log.info("Retrieving customer");
-        String url = constants.getCUSTOMER_INFO_SERVICE_URL() + "/customers/" + id;
+        String url = "api/v1/customers/" + id;
         Mono<CustomerCustomerServiceResponseDTO> retrievedCustomer = webClientBuilder.build().get()
                 .uri(uriBuilder -> uriBuilder
+                        .host(constants.getCUSTOMER_INFO_SERVICE_URL())
                         .path(url)
                         .build())
                 .retrieve()

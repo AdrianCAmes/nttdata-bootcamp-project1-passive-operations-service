@@ -10,6 +10,7 @@ import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 @Configuration
 public class WebClientConfig {
     @Bean
+    @LoadBalanced
     public WebClient.Builder webClientUser() {
         return WebClient.builder()
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
