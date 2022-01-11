@@ -1,39 +1,10 @@
-# Server config
-server:
-  port: 8082
-
-# Spring Config
 spring:
-  data:
-    mongodb:
-      database: ProjectOne
-      host: localhost
   application:
     name: passive-operations-service
-
-eureka:
-  instance:
-    hostname: localhost
-    serviceUrl:
-      defaultZone: http://${eureka.instance.hostname}:8761/eureka/
-    prefer-ip-address: true
-
-# Constants
-constants:
-  status:
-    blocked: Blocked
-    active: Active
-  account:
-    current_type: Current
-    savings_type: Savings
-    long_term_type:  Long term
-  customer:
-    personal_type: Personal
-    business_type: Business
-  operation:
-    deposit_type: Deposit
-    withdrawal_type: Withdrawal
-  eureka:
-    service_url:
-      customer_info_service: localhost:8081/api/v1
-      # customer_info_service: customer-info-service
+  cloud:
+    config:
+      uri: http://localhost:8888
+      username: root
+      password: p1a2s3s
+  config:
+    import: optional:configserver:http://localhost:8888
