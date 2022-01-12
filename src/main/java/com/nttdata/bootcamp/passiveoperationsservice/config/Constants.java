@@ -10,6 +10,9 @@ public class Constants {
     @Value("${constants.eureka.service_url.customer_info_service}")
     private String CUSTOMER_INFO_SERVICE_URL;
 
+    @Value("${constants.eureka.service_url.gateway_service}")
+    private String GATEWAY_SERVICE_URL;
+
     @Value("${constants.customer.personal_type}")
     private String CUSTOMER_PERSONAL_TYPE;
 
