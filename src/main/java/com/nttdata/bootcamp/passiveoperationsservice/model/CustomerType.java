@@ -8,8 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @ToString
-public class Customer {
-    private String id;
-    private CustomerType customerType;
-    private String status;
+public class CustomerType {
+    private String group;
+    private String subgroup;
 }

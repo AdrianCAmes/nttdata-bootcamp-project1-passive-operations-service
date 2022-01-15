@@ -7,6 +7,7 @@ import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountF
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CreditActiveServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.BusinessLogicException;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.ElementBlockedException;
@@ -51,6 +52,7 @@ public class AccountController {
                 .onErrorResume(BusinessLogicException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()))
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
+                .onErrorResume(NullPointerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
     }
 
@@ -62,6 +64,7 @@ public class AccountController {
                 .onErrorResume(ElementBlockedException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.LOCKED).build()))
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
+                .onErrorResume(NullPointerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
     }
 
@@ -86,6 +89,12 @@ public class AccountController {
         log.info("Get operation in /customers-service/{}", id);
         return accountService.findByIdCustomerService(id);
     }
+
+    @GetMapping("active-service/customers/{id}/credits")
+    public Flux<CreditActiveServiceResponseDTO> findCreditsByCustomerIdActiveService(@PathVariable("id") String id) {
+        log.info("Get operation in /customers-service/{}", id);
+        return accountService.findCreditsByCustomerIdActiveService(id);
+    }
     //endregion
 
     //region UseCases
@@ -98,6 +107,7 @@ public class AccountController {
                 .onErrorResume(BusinessLogicException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()))
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
+                .onErrorResume(NullPointerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
     }
 

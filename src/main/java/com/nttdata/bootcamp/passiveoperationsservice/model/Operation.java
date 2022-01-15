@@ -16,4 +16,6 @@ public class Operation {
     private Date time;
     private String type;
     private Double amount;
+    private Double commission;
+    private Double finalBalance;
 }

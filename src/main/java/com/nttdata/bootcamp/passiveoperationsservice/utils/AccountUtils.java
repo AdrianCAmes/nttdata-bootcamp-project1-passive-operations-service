@@ -12,7 +12,7 @@ public interface AccountUtils {
     Account accountDoOperationDTOToAccount(AccountDoOperationRequestDTO accountDTO);
     Account accountFindBalancesResponseDTOToAccount(AccountFindBalancesResponseDTO accountDTO);
     AccountCreateRequestDTO accountToAccountCreateRequestDTO(Account account);
-    AccountUpdateRequestDTO accountToAccountUpdateCreateRequestDTO(Account account);
+    AccountUpdateRequestDTO accountToAccountUpdateRequestDTO(Account account);
     AccountDoOperationRequestDTO accountToAccountDoOperationRequestDTO(Account account);
     AccountFindBalancesResponseDTO accountToAccountFindBalancesResponseDTO(Account account);
     Account fillAccountWithAccountUpdateRequestDTO(Account account, AccountUpdateRequestDTO accountDTO);

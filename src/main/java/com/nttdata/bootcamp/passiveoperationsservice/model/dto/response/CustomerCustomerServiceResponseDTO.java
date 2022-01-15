@@ -10,7 +10,7 @@ import lombok.*;
 @ToString
 public class CustomerCustomerServiceResponseDTO {
     private String id;
-    private String type;
+    private CustomerTypeCustomerServiceResponseDTO customerType;
     private String status;
     private PersonDetailsCustomerServiceResponseDTO personDetails;
     private BusinessDetailsCustomerServiceResponseDTO businessDetails;

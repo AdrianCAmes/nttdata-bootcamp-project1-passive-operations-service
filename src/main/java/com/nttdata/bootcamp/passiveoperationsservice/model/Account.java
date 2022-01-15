@@ -20,6 +20,7 @@ public class Account {
     private String status;
     private Customer customer;
     private AccountType accountType;
+    private AccountSpecifications accountSpecifications;
     private String accountNumber;
     private Date issueDate;
     private Date dueDate;

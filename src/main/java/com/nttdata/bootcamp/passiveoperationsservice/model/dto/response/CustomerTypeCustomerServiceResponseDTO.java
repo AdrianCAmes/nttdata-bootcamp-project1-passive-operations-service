@@ -1,4 +1,4 @@
-package com.nttdata.bootcamp.passiveoperationsservice.model;
+package com.nttdata.bootcamp.passiveoperationsservice.model.dto.response;
 
 import lombok.*;
 
@@ -8,7 +8,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 @ToString
-public class AccountType {
+public class CustomerTypeCustomerServiceResponseDTO {
     private String group;
     private String subgroup;
 }

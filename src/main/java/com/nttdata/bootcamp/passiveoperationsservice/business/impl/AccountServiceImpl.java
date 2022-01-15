@@ -1,13 +1,12 @@
 package com.nttdata.bootcamp.passiveoperationsservice.business.impl;
 
 import com.nttdata.bootcamp.passiveoperationsservice.business.AccountService;
-import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
-import com.nttdata.bootcamp.passiveoperationsservice.model.Customer;
-import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
+import com.nttdata.bootcamp.passiveoperationsservice.model.*;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CreditActiveServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.repository.AccountRepository;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountUtils;
@@ -151,6 +150,26 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    public Flux<CreditActiveServiceResponseDTO> findCreditsByCustomerIdActiveService(String id) {
+        log.info("Start of operation to retrieve credits of customer with id [{}] from active-operation-service", id);
+
+        log.info("Retrieving credits");
+        String url = constants.getACTIVE_OPERATIONS_SERVICE_URL() + "/api/v1/customers/" + id + "/credits";
+        Flux<CreditActiveServiceResponseDTO> retrievedCredits = webClientBuilder.build().get()
+                .uri(uriBuilder -> uriBuilder
+                        .host(constants.getGATEWAY_SERVICE_URL())
+                        .path(url)
+                        .build())
+                .retrieve()
+                .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
+                .bodyToFlux(CreditActiveServiceResponseDTO.class);
+        log.info("Customer retrieved successfully");
+
+        log.info("End of operation to retrieve customer with id: [{}]", id);
+        return retrievedCredits;
+    }
+
+    @Override
     public Flux<Account> findByCustomerId(String id) {
         log.info("Start of operation to retrieve all accounts of the customer with id: [{}]", id);
 
@@ -252,15 +271,21 @@ public class AccountServiceImpl implements AccountService {
             return Mono.error(new ElementBlockedException("The customer have blocked status"));
         }
 
-
         if (accountToCreate.getHolders() == null || accountToCreate.getHolders().isEmpty()) {
             log.warn("Account does not contain holders, must have at least one");
             log.warn("Proceeding to abort create account");
             return Mono.error(new IllegalArgumentException("Account does not contain holders"));
         }
 
-        if (customerFromMicroservice.getType().contentEquals(constants.getCUSTOMER_PERSONAL_TYPE()))
+        if (customerFromMicroservice.getCustomerType().getGroup().contentEquals(constants.getCUSTOMER_PERSONAL_GROUP()))
         {
+            if (customerFromMicroservice.getCustomerType().getSubgroup().contentEquals(constants.getCUSTOMER_PERSONAL_STANDARD_SUBGROUP()) &&
+            accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_SAVINGS_VIP_SUBGROUP())) {
+                log.warn("Standard customers can not create vip accounts");
+                log.warn("Proceeding to abort create account");
+                return Mono.error(new BusinessLogicException("Standard customer can not create vip accounts"));
+            }
+
             return findByCustomerId(customerFromMicroservice.getId())
                     .filter(retrievedAccount -> retrievedAccount.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
                     .hasElements()
@@ -270,20 +295,58 @@ public class AccountServiceImpl implements AccountService {
                             log.warn("Proceeding to abort create account");
                             return Mono.error(new BusinessLogicException("Customer have more than one account"));
                         }
-                        else {
+
+                        if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_SAVINGS_VIP_SUBGROUP())) {
+                            return findCreditsByCustomerIdActiveService(customerFromMicroservice.getId())
+                                    .filter(retrievedCredit -> retrievedCredit.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
+                                    .hasElements()
+                                    .flatMap(haveACredit -> {
+                                        if (!haveACredit) {
+                                            log.warn("Can not create savings vip account because customer does not have a credit product");
+                                            log.warn("Proceeding to abort create account");
+                                            return Mono.error(new BusinessLogicException("Customer does not have a credit product"));
+                                        }
+
+                                        log.info("Account successfully validated");
+                                        return Mono.just(customerFromMicroservice);
+                                    });
+                        } else {
                             log.info("Account successfully validated");
                             return Mono.just(customerFromMicroservice);
                         }
                     });
-        } else if (customerFromMicroservice.getType().contentEquals(constants.getCUSTOMER_BUSINESS_TYPE())) {
-            if (accountToCreate.getAccountType().getDescription().contentEquals(constants.getACCOUNT_CURRENT_TYPE()))
+        } else if (customerFromMicroservice.getCustomerType().getGroup().contentEquals(constants.getCUSTOMER_BUSINESS_GROUP())) {
+            if (!accountToCreate.getAccountType().getGroup().contentEquals(constants.getACCOUNT_CURRENT_GROUP()))
             {
-                log.info("Account successfully validated");
-                return Mono.just(customerFromMicroservice);
-            } else {
-                log.warn("Can not create {} account for business customers. Accounts must be of current type", accountToCreate.getAccountType().getDescription());
+                log.warn("Can not create {} account for business customers. Accounts must be of current type", accountToCreate.getAccountType().getGroup());
                 log.warn("Proceeding to abort create account");
                 return Mono.error(new BusinessLogicException("Account is not of current type"));
+            }
+
+            if (customerFromMicroservice.getCustomerType().getSubgroup().contentEquals(constants.getCUSTOMER_BUSINESS_STANDARD_SUBGROUP()) &&
+                    accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_CURRENT_PYME_SUBGROUP())) {
+                log.warn("Standard customers can not create pyme accounts");
+                log.warn("Proceeding to abort create account");
+                return Mono.error(new BusinessLogicException("Standard customer can not create pyme accounts"));
+            }
+
+            if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_CURRENT_PYME_SUBGROUP())) {
+                return findCreditsByCustomerIdActiveService(customerFromMicroservice.getId())
+                        .filter(retrievedCredit -> retrievedCredit.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
+                        .hasElements()
+                        .flatMap(haveACredit -> {
+                            if (!haveACredit) {
+                                log.warn("Can not create current pyme account because customer does not have a credit product");
+                                log.warn("Proceeding to abort create account");
+                                return Mono.error(new BusinessLogicException("Customer does not have a credit product"));
+                            }
+
+                            log.info("Account successfully validated");
+                            return Mono.just(customerFromMicroservice);
+                        });
+            } else {
+                log.info("Account successfully validated");
+                return Mono.just(customerFromMicroservice);
             }
         } else {
             log.warn("Customer's type is not supported");
@@ -327,17 +390,17 @@ public class AccountServiceImpl implements AccountService {
             return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
         }
 
-        if (accountInDatabase.getAccountType().getDescription().contentEquals(constants.getACCOUNT_LONG_TERM_TYPE()) &&
-            !accountInDatabase.getAccountType().getAllowedDayForOperations().equals(Calendar.getInstance().get(Calendar.DAY_OF_MONTH))) {
+        if (accountInDatabase.getAccountType().getGroup().contentEquals(constants.getACCOUNT_LONG_TERM_GROUP()) &&
+            !accountInDatabase.getAccountSpecifications().getAllowedDayForOperations().equals(Calendar.getInstance().get(Calendar.DAY_OF_MONTH))) {
             log.info("Allowed day [{}] for operations in this account does not match with current day of the month [{}]",
-                    accountInDatabase.getAccountType().getAllowedDayForOperations(),
+                    accountInDatabase.getAccountSpecifications().getAllowedDayForOperations(),
                     Calendar.getInstance().get(Calendar.DAY_OF_MONTH));
             log.warn("Proceeding to abort do operation");
             return Mono.error(new BusinessLogicException("Allowed day for operations in this account does not match with current day of the month"));
         }
 
-        if (accountInDatabase.getAccountType().getMaximumNumberOfOperations() != null &&
-            accountInDatabase.getAccountType().getMaximumNumberOfOperations().equals(accountInDatabase.getDoneOperationsInMonth())) {
+        if (accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations() != null &&
+            accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations().equals(accountInDatabase.getDoneOperationsInMonth())) {
             log.info("Maximum number of operations reached, can not do more operations");
             log.warn("Proceeding to abort do operation");
             return Mono.error(new BusinessLogicException("Maximum number of operations reached, can not do more operations"));
