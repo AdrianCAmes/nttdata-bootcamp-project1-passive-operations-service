@@ -6,10 +6,9 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @ToString
-public class AccountFindBalancesResponseDTO {
+public class CustomerActiveServiceResponseDTO {
     private String id;
-    private AccountTypeFindBalancesResponseDTO accountType;
-    private Double currentBalance;
+    private CustomerTypeActiveServiceResponseDTO customerType;
+    private String status;
 }

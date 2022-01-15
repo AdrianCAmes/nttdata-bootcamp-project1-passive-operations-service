@@ -1,13 +1,13 @@
 package com.nttdata.bootcamp.passiveoperationsservice.utils.impl;
 
 import com.nttdata.bootcamp.passiveoperationsservice.model.Account;
-import com.nttdata.bootcamp.passiveoperationsservice.model.AccountType;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Customer;
 import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountTypeUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.OperationUtils;
 import lombok.RequiredArgsConstructor;
@@ -24,11 +24,13 @@ import java.util.UUID;
 @Slf4j
 public class AccountUtilsImpl implements AccountUtils {
     private final OperationUtils operationUtils;
+    private final AccountTypeUtils accountTypeUtils;
 
     public Account accountCreateRequestDTOToAccount(AccountCreateRequestDTO accountDTO){
         return Account.builder()
                 .customer(Customer.builder().id(accountDTO.getCustomerId()).build())
                 .accountType(accountDTO.getAccountType())
+                .accountSpecifications(accountDTO.getAccountSpecifications())
                 .accountNumber(UUID.randomUUID().toString())
                 .issueDate(accountDTO.getIssueDate())
                 .dueDate(accountDTO.getDueDate())
@@ -64,14 +66,16 @@ public class AccountUtilsImpl implements AccountUtils {
         return Account.builder()
                 .id(accountDTO.getId())
                 .currentBalance(accountDTO.getCurrentBalance())
-                .accountType(AccountType.builder().description(accountDTO.getAccountType()).build())
+                .accountType(accountTypeUtils.accountTypeFindBalancesResponseDTOToAccountType(accountDTO.getAccountType()))
                 .build();
     }
 
+    @Override
     public AccountCreateRequestDTO accountToAccountCreateRequestDTO(Account account) {
         return AccountCreateRequestDTO.builder()
                 .customerId(account.getCustomer().getId())
                 .accountType(account.getAccountType())
+                .accountSpecifications(account.getAccountSpecifications())
                 .issueDate(account.getIssueDate())
                 .dueDate(account.getDueDate())
                 .holders(account.getHolders())
@@ -79,7 +83,8 @@ public class AccountUtilsImpl implements AccountUtils {
                 .build();
     }
 
-    public AccountUpdateRequestDTO accountToAccountUpdateCreateRequestDTO(Account account) {
+    @Override
+    public AccountUpdateRequestDTO accountToAccountUpdateRequestDTO(Account account) {
         return AccountUpdateRequestDTO.builder()
                 .id(account.getId())
                 .dueDate(account.getDueDate())
@@ -104,10 +109,11 @@ public class AccountUtilsImpl implements AccountUtils {
         return AccountFindBalancesResponseDTO.builder()
                 .id(account.getId())
                 .currentBalance(account.getCurrentBalance())
-                .accountType(account.getAccountType().getDescription())
+                .accountType(accountTypeUtils.accountTypeToAccountTypeFindBalancesResponseDTO(account.getAccountType()))
                 .build();
     }
 
+    @Override
     public Account fillAccountWithAccountUpdateRequestDTO(Account account, AccountUpdateRequestDTO accountDTO) {
         account.setId(accountDTO.getId());
         account.setStatus(accountDTO.getStatus());
