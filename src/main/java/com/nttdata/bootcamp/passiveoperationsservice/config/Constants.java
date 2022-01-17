@@ -69,4 +69,10 @@ public class Constants {
 
     @Value("${constants.operation.withdrawal_type}")
     private String OPERATION_WITHDRAWAL_TYPE;
+
+    @Value("${constants.operation.transfer_out_type}")
+    private String OPERATION_TRANSFER_OUT_TYPE;
+
+    @Value("${constants.operation.transfer_in_type}")
+    private String OPERATION_TRANSFER_IN_TYPE;
 }

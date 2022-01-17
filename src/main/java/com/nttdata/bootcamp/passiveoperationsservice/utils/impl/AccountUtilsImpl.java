@@ -125,18 +125,4 @@ public class AccountUtilsImpl implements AccountUtils {
         account.setSigners(accountDTO.getSigners());
         return account;
     }
-
-    @Override
-    public Account fillAccountWithAccountDoOperationRequestDTO(Account account, AccountDoOperationRequestDTO accountDTO) {
-        Operation operation = operationUtils.operationDoOperationRequestDTOToOperation(accountDTO.getOperation());
-        operation.setTime(new Date());
-
-        ArrayList<Operation> operations = account.getOperations() == null ? new ArrayList<>() : account.getOperations();
-        operations.add(operation);
-
-        account.setOperations(operations);
-        account.setId(account.getId());
-
-        return account;
-    }
 }

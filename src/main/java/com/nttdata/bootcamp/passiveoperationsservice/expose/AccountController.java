@@ -9,16 +9,20 @@ import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDo
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CreditActiveServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.OperationCommissionResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.BusinessLogicException;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.ElementBlockedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.ws.rs.QueryParam;
+import java.util.Date;
 import java.util.NoSuchElementException;
 
 @RestController
@@ -107,7 +111,6 @@ public class AccountController {
                 .onErrorResume(BusinessLogicException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build()))
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
-                .onErrorResume(NullPointerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
     }
 
@@ -124,6 +127,14 @@ public class AccountController {
     public Flux<Operation> findOperationsByAccountId(@PathVariable("id") String id) {
         log.info("Get operation in /accounts/{}/operations", id);
         return accountService.findOperationsByAccountId(id);
+    }
+
+    @GetMapping("/accounts/{id}/commissions")
+    public Flux<OperationCommissionResponseDTO> findCommissionsBetweenDatesByAccountId(@RequestParam(value = "date-from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date dateFrom,
+                                                                                  @RequestParam(value = "date-to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) Date dateTo,
+                                                                                  @PathVariable("id") String id) {
+        log.info("Get operation in /accounts/{}/commissions", id);
+        return accountService.findCommissionsBetweenDatesByAccountId(dateFrom, dateTo, id);
     }
 
     @GetMapping("customers/{id}/accounts/balance")

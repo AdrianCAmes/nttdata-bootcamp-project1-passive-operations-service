@@ -5,13 +5,17 @@ import com.nttdata.bootcamp.passiveoperationsservice.model.*;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountCreateRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUpdateRequestDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.OperationDoOperationRequestDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CreditActiveServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.OperationCommissionResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.repository.AccountRepository;
+import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountSpecificationsUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.AccountUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.CustomerUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.config.Constants;
+import com.nttdata.bootcamp.passiveoperationsservice.utils.OperationUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.BusinessLogicException;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.ElementBlockedException;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +26,9 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.NoSuchElementException;
 
 @Service
@@ -34,6 +40,8 @@ public class AccountServiceImpl implements AccountService {
     private final WebClient.Builder webClientBuilder;
     private final AccountUtils accountUtils;
     private final CustomerUtils customerUtils;
+    private final OperationUtils operationUtils;
+    private final AccountSpecificationsUtils accountSpecificationsUtils;
     private final Constants constants;
 
     @Override
@@ -190,21 +198,24 @@ public class AccountServiceImpl implements AccountService {
                             log.info("Validating operation");
                             return operationValidation(accountDTO, retrievedAccount);
                         })
-                        .flatMap(validatedAccount -> {
-                            Double amountToUpdate = accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_DEPOSIT_TYPE()) ?
-                                    validatedAccount.getCurrentBalance() + accountDTO.getOperation().getAmount() :
-                                    validatedAccount.getCurrentBalance() - accountDTO.getOperation().getAmount();
-                            validatedAccount.setCurrentBalance(amountToUpdate);
-                            validatedAccount.setDoneOperationsInMonth(validatedAccount.getDoneOperationsInMonth() == null ? 1 : validatedAccount.getDoneOperationsInMonth() + 1);
-
-                            Account accountToUpdate = accountUtils.fillAccountWithAccountDoOperationRequestDTO(validatedAccount, accountDTO);
-
-                            log.info("Doing deposit of [{}] to account with id [{}]", accountDTO.getOperation().getAmount(), accountDTO.getId());
-                            log.info("Saving operation into account: [{}]", accountToUpdate.toString());
-                            Mono<Account> nestedUpdatedAccount = accountRepository.save(accountToUpdate);
-                            log.info("Operation was successfully updated");
-
-                            return nestedUpdatedAccount;
+                        .flatMap(validatedAccount -> storeOperationIntoAccount(accountDTO, validatedAccount))
+                        .flatMap(transformedAccount -> {
+                            if (accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_OUT_TYPE())) {
+                                // Creates the operation for the transfer in
+                                AccountDoOperationRequestDTO targetAccountOperation = AccountDoOperationRequestDTO.builder()
+                                                .id(accountDTO.getTargetId())
+                                                .operation(OperationDoOperationRequestDTO.builder()
+                                                        .amount(accountDTO.getOperation().getAmount())
+                                                        .type(constants.getOPERATION_TRANSFER_IN_TYPE())
+                                                        .build())
+                                                .build();
+                                log.info("Sending operation to receiver account with id: [{}]", accountDTO.getTargetId());
+                                return doOperation(targetAccountOperation)
+                                        .flatMap(transferInAccount -> accountRepository.save(transformedAccount));
+                            } else {
+                                log.info("Saving operation into account: [{}]", transformedAccount.toString());
+                                return accountRepository.save(transformedAccount);
+                            }
                         })
                         .switchIfEmpty(Mono.error(new NoSuchElementException("Account does not exist")));
 
@@ -224,6 +235,26 @@ public class AccountServiceImpl implements AccountService {
         log.info("Operations retrieved successfully");
 
         log.info("End of operation to retrieve operations from account with id: [{}]", id);
+        return retrievedOperations;
+    }
+
+    @Override
+    public Flux<OperationCommissionResponseDTO> findCommissionsBetweenDatesByAccountId(Date dateFrom, Date dateTo, String id) {
+        log.info("Start of operation to retrieve all commissions from account with id: [{}] from [] to []", id, dateFrom, dateTo);
+
+        log.info("Retrieving all commissions");
+        Flux<OperationCommissionResponseDTO> retrievedOperations = findById(id)
+                .filter(retrievedAccount -> retrievedAccount.getOperations() != null)
+                .flux()
+                .flatMap(retrievedAccount -> Flux.fromIterable(retrievedAccount.getOperations()))
+                .filter(retrievedOperation -> retrievedOperation.getCommission() != null &&
+                                                retrievedOperation.getCommission() > 0 &&
+                                                retrievedOperation.getTime().after(dateFrom) &&
+                                                retrievedOperation.getTime().before(dateTo))
+                .map(retrievedOperation -> operationUtils.operationToOperationCommissionResponseDTO(retrievedOperation));
+        log.info("Commissions retrieved successfully");
+
+        log.info("End of operation to retrieve commissions from account with id: [{}]", id);
         return retrievedOperations;
     }
 
@@ -383,11 +414,23 @@ public class AccountServiceImpl implements AccountService {
             return Mono.error(new ElementBlockedException("The account have blocked status"));
         }
 
-        if (accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOPERATION_WITHDRAWAL_TYPE()) &&
-            accountInDatabase.getCurrentBalance() < accountToUpdateOperation.getOperation().getAmount()) {
-            log.info("Account has insufficient funds");
-            log.warn("Proceeding to abort do operation");
-            return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
+        if (accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOPERATION_WITHDRAWAL_TYPE()) ||
+                accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_OUT_TYPE())) {
+
+            Double amountToTake = accountToUpdateOperation.getOperation().getAmount();
+            if (accountInDatabase.getAccountSpecifications() != null &&
+                    accountInDatabase.getAccountSpecifications().getOperationCommissionPercentage() != null &&
+                    accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations() != null &&
+                    accountInDatabase.getDoneOperationsInMonth() != null &&
+                    accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations() <= accountInDatabase.getDoneOperationsInMonth()) {
+                amountToTake = accountSpecificationsUtils.roundDouble(accountSpecificationsUtils.applyInterests(amountToTake, accountInDatabase.getAccountSpecifications().getOperationCommissionPercentage()), 2);
+            }
+
+            if (accountInDatabase.getCurrentBalance() < amountToTake) {
+                log.info("Account has insufficient funds");
+                log.warn("Proceeding to abort do operation");
+                return Mono.error(new IllegalArgumentException("The account has insufficient funds"));
+            }
         }
 
         if (accountInDatabase.getAccountType().getGroup().contentEquals(constants.getACCOUNT_LONG_TERM_GROUP()) &&
@@ -399,14 +442,43 @@ public class AccountServiceImpl implements AccountService {
             return Mono.error(new BusinessLogicException("Allowed day for operations in this account does not match with current day of the month"));
         }
 
-        if (accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations() != null &&
-            accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations().equals(accountInDatabase.getDoneOperationsInMonth())) {
-            log.info("Maximum number of operations reached, can not do more operations");
-            log.warn("Proceeding to abort do operation");
-            return Mono.error(new BusinessLogicException("Maximum number of operations reached, can not do more operations"));
+        log.info("Operation successfully validated");
+        return Mono.just(accountInDatabase);
+    }
+
+    private Mono<Account> storeOperationIntoAccount(AccountDoOperationRequestDTO accountDTO, Account accountInDatabase) {
+        Double commission = 0.0;
+        if (!accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_IN_TYPE())) {
+            // Increments the number of done operations
+            accountInDatabase.setDoneOperationsInMonth(accountInDatabase.getDoneOperationsInMonth() == null ? 1 : accountInDatabase.getDoneOperationsInMonth() + 1);
+
+            // Calculates the commission
+            if (accountInDatabase.getAccountSpecifications() != null &&
+                    accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations() != null &&
+                    accountInDatabase.getDoneOperationsInMonth() > accountInDatabase.getAccountSpecifications().getMaximumNumberOfOperations())
+            {
+                commission = accountSpecificationsUtils.roundDouble(accountSpecificationsUtils.calculateCommission(accountDTO.getOperation().getAmount(), accountInDatabase.getAccountSpecifications().getOperationCommissionPercentage()), 2);
+            }
         }
 
-        log.info("Operation successfully validated");
+        // Calculates the new current balance
+        Double newCurrentBalance = accountSpecificationsUtils.roundDouble((accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_DEPOSIT_TYPE()) ||
+                accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_IN_TYPE())) ?
+                accountInDatabase.getCurrentBalance() + accountDTO.getOperation().getAmount() - commission :
+                accountInDatabase.getCurrentBalance() - accountDTO.getOperation().getAmount() - commission, 2);
+        accountInDatabase.setCurrentBalance(newCurrentBalance);
+
+        // Creates the new operation
+        Operation operation = operationUtils.operationDoOperationRequestDTOToOperation(accountDTO.getOperation());
+        operation.setTime(new Date());
+        operation.setCommission(commission);
+        operation.setFinalBalance(newCurrentBalance);
+
+        ArrayList<Operation> operations = accountInDatabase.getOperations() == null ? new ArrayList<>() : accountInDatabase.getOperations();
+        operations.add(operation);
+
+        accountInDatabase.setOperations(operations);
+
         return Mono.just(accountInDatabase);
     }
     //endregion
