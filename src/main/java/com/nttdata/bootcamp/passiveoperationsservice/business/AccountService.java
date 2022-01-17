@@ -8,8 +8,11 @@ import com.nttdata.bootcamp.passiveoperationsservice.model.dto.request.AccountUp
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.AccountFindBalancesResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CreditActiveServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
+import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.OperationCommissionResponseDTO;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.Date;
 
 public interface AccountService {
     Mono<Account> create(AccountCreateRequestDTO accountDTO);
@@ -20,6 +23,7 @@ public interface AccountService {
     Mono<CustomerCustomerServiceResponseDTO> findByIdCustomerService(String id);
     Flux<CreditActiveServiceResponseDTO> findCreditsByCustomerIdActiveService(String id);
     Flux<Account> findByCustomerId(String id);
+    Flux<OperationCommissionResponseDTO> findCommissionsBetweenDatesByAccountId(Date dateFrom, Date dateTo, String id);
     Mono<Account> doOperation(AccountDoOperationRequestDTO accountDTO);
     Flux<Operation> findOperationsByAccountId(String id);
     Flux<AccountFindBalancesResponseDTO> findBalancesByCustomerId(String id);

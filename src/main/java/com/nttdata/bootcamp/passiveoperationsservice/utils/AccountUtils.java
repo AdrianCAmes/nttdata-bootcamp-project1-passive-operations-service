@@ -16,5 +16,4 @@ public interface AccountUtils {
     AccountDoOperationRequestDTO accountToAccountDoOperationRequestDTO(Account account);
     AccountFindBalancesResponseDTO accountToAccountFindBalancesResponseDTO(Account account);
     Account fillAccountWithAccountUpdateRequestDTO(Account account, AccountUpdateRequestDTO accountDTO);
-    Account fillAccountWithAccountDoOperationRequestDTO(Account account, AccountDoOperationRequestDTO accountDTO);
 }

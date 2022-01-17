@@ -12,4 +12,5 @@ import lombok.*;
 public class AccountDoOperationRequestDTO {
     private String id;
     private OperationDoOperationRequestDTO operation;
+    private String targetId;
 }
