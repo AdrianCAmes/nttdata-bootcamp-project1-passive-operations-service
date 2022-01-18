@@ -1,6 +1,5 @@
 package com.nttdata.bootcamp.passiveoperationsservice.model.dto.request;
 
-import com.nttdata.bootcamp.passiveoperationsservice.model.Operation;
 import lombok.*;
 
 @Getter
