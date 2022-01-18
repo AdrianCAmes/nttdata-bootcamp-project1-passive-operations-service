@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: passive-operations-service
+  cloud:
+    config:
+      uri: http://localhost:8888
+      username: root
+      password: p1a2s3s
+  config:
+    import: optional:configserver:http://localhost:8888
