@@ -8,71 +8,71 @@ import org.springframework.stereotype.Component;
 @Getter
 public class Constants {
     @Value("${constants.eureka.service_url.customer_info_service:}")
-    private String CUSTOMER_INFO_SERVICE_URL;
+    private String customerInfoServiceUrl;
 
     @Value("${constants.eureka.service_url.active_operations_service:}")
-    private String ACTIVE_OPERATIONS_SERVICE_URL;
+    private String activeOperationsServiceUrl;
 
     @Value("${constants.eureka.service_url.gateway_service:}")
-    private String GATEWAY_SERVICE_URL;
+    private String gatewayServiceUrl;
 
     @Value("${constants.customer.personal_group.name:}")
-    private String CUSTOMER_PERSONAL_GROUP;
+    private String customerPersonalGroup;
 
     @Value("${constants.customer.personal_group.subgroup.standard:}")
-    private String CUSTOMER_PERSONAL_STANDARD_SUBGROUP;
+    private String customerPersonalStandardSubgroup;
 
     @Value("${constants.customer.personal_group.subgroup.vip:}")
-    private String CUSTOMER_PERSONAL_VIP_SUBGROUP;
+    private String customerPersonalVipSubgroup;
 
     @Value("${constants.customer.business_group.name:}")
-    private String CUSTOMER_BUSINESS_GROUP;
+    private String customerBusinessGroup;
 
     @Value("${constants.customer.business_group.subgroup.standard:}")
-    private String CUSTOMER_BUSINESS_STANDARD_SUBGROUP;
+    private String customerBusinessStandardSubgroup;
 
     @Value("${constants.customer.business_group.subgroup.pyme:}")
-    private String CUSTOMER_BUSINESS_PYME_SUBGROUP;
+    private String customerBusinessPymeSubgroup;
 
     @Value("${constants.account.current_group.name:}")
-    private String ACCOUNT_CURRENT_GROUP;
+    private String accountCurrentGroup;
 
     @Value("${constants.account.current_group.subgroup.standard:}")
-    private String ACCOUNT_CURRENT_STANDARD_SUBGROUP;
+    private String accountCurrentStandardSubgroup;
 
     @Value("${constants.account.current_group.subgroup.pyme:}")
-    private String ACCOUNT_CURRENT_PYME_SUBGROUP;
+    private String accountCurrentPymeSubgroup;
 
     @Value("${constants.account.savings_group.name:}")
-    private String ACCOUNT_SAVINGS_GROUP;
+    private String accountSavingsGroup;
 
     @Value("${constants.account.savings_group.subgroup.standard:}")
-    private String ACCOUNT_SAVINGS_STANDARD_SUBGROUP;
+    private String accountSavingsStandardSubgroup;
 
     @Value("${constants.account.savings_group.subgroup.vip:}")
-    private String ACCOUNT_SAVINGS_VIP_SUBGROUP;
+    private String accountSavingsVipSubgroup;
 
     @Value("${constants.account.long_term_group.name:}")
-    private String ACCOUNT_LONG_TERM_GROUP;
+    private String accountLongTermGroup;
 
     @Value("${constants.account.long_term_group.subgroup.standard:}")
-    private String ACCOUNT_LONG_TERM_STANDARD_SUBGROUP;
+    private String accountLongTermStandardSubgroup;
 
     @Value("${constants.status.blocked:}")
-    private String STATUS_BLOCKED;
+    private String statusBlocked;
 
     @Value("${constants.status.active:}")
-    private String STATUS_ACTIVE;
+    private String statusActive;
 
     @Value("${constants.operation.deposit_type:}")
-    private String OPERATION_DEPOSIT_TYPE;
+    private String operationDepositType;
 
     @Value("${constants.operation.withdrawal_type:}")
-    private String OPERATION_WITHDRAWAL_TYPE;
+    private String operationWithdrawalType;
 
     @Value("${constants.operation.transfer_out_type:}")
-    private String OPERATION_TRANSFER_OUT_TYPE;
+    private String operationTransferOutType;
 
     @Value("${constants.operation.transfer_in_type:}")
-    private String OPERATION_TRANSFER_IN_TYPE;
+    private String operationTransferInType;
 }

@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -51,15 +50,27 @@ public class AccountServiceImpl implements AccountService {
         if (accountDTO.getCustomerId() == null || !accountDTO.getCustomerId().isBlank()) {
             Mono<Account> createdAccount = findByIdCustomerService(accountDTO.getCustomerId())
                     .flatMap(retrievedCustomer -> {
-                        log.info("Validating account");
-                        return accountToCreateValidation(accountDTO, retrievedCustomer);
+                        log.info("Applying generic account validations");
+                        return accountToCreateGenericValidation(accountDTO, retrievedCustomer);
+                    })
+                    .flatMap(genericValidatedCustomer -> {
+                        log.info("Applying customer group validations");
+                        if (genericValidatedCustomer.getCustomerType().getGroup().contentEquals(constants.getCustomerPersonalGroup())) {
+                            return accountToCreatePersonalCustomersValidation(accountDTO, genericValidatedCustomer);
+                        } else if (genericValidatedCustomer.getCustomerType().getGroup().contentEquals(constants.getCustomerBusinessGroup())) {
+                            return accountToCreateBusinessCustomersValidation(accountDTO, genericValidatedCustomer);
+                        } else {
+                            log.warn("Customer's type is not supported");
+                            log.warn("Proceeding to abort create account");
+                            return Mono.error(new BusinessLogicException("Not supported customer type"));
+                        }
                     })
                     .flatMap(validatedCustomer -> {
                         Account accountToCreate = accountUtils.accountCreateRequestDTOToAccount(accountDTO);
                         Customer customer = customerUtils.customerCustomerServiceDTOToCustomer(validatedCustomer);
 
                         accountToCreate.setCustomer(customer);
-                        accountToCreate.setStatus(constants.getSTATUS_ACTIVE());
+                        accountToCreate.setStatus(constants.getStatusActive());
                         accountToCreate.setCurrentBalance(0.0);
 
                         log.info("Creating new account: [{}]", accountToCreate.toString());
@@ -142,10 +153,10 @@ public class AccountServiceImpl implements AccountService {
         log.info("Start of operation to retrieve customer with id [{}] from customer-info-service", id);
 
         log.info("Retrieving customer");
-        String url = constants.getCUSTOMER_INFO_SERVICE_URL() + "/api/v1/customers/" + id;
+        String url = constants.getCustomerInfoServiceUrl() + "/api/v1/customers/" + id;
         Mono<CustomerCustomerServiceResponseDTO> retrievedCustomer = webClientBuilder.build().get()
                 .uri(uriBuilder -> uriBuilder
-                        .host(constants.getGATEWAY_SERVICE_URL())
+                        .host(constants.getGatewayServiceUrl())
                         .path(url)
                         .build())
                 .retrieve()
@@ -162,10 +173,10 @@ public class AccountServiceImpl implements AccountService {
         log.info("Start of operation to retrieve credits of customer with id [{}] from active-operation-service", id);
 
         log.info("Retrieving credits");
-        String url = constants.getACTIVE_OPERATIONS_SERVICE_URL() + "/api/v1/customers/" + id + "/credits";
+        String url = constants.getActiveOperationsServiceUrl() + "/api/v1/customers/" + id + "/credits";
         Flux<CreditActiveServiceResponseDTO> retrievedCredits = webClientBuilder.build().get()
                 .uri(uriBuilder -> uriBuilder
-                        .host(constants.getGATEWAY_SERVICE_URL())
+                        .host(constants.getGatewayServiceUrl())
                         .path(url)
                         .build())
                 .retrieve()
@@ -200,13 +211,13 @@ public class AccountServiceImpl implements AccountService {
                         })
                         .flatMap(validatedAccount -> storeOperationIntoAccount(accountDTO, validatedAccount))
                         .flatMap(transformedAccount -> {
-                            if (accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_OUT_TYPE())) {
+                            if (accountDTO.getOperation().getType().contentEquals(constants.getOperationTransferOutType())) {
                                 // Creates the operation for the transfer in
                                 AccountDoOperationRequestDTO targetAccountOperation = AccountDoOperationRequestDTO.builder()
                                                 .id(accountDTO.getTargetId())
                                                 .operation(OperationDoOperationRequestDTO.builder()
                                                         .amount(accountDTO.getOperation().getAmount())
-                                                        .type(constants.getOPERATION_TRANSFER_IN_TYPE())
+                                                        .type(constants.getOperationTransferInType())
                                                         .build())
                                                 .build();
                                 log.info("Sending operation to receiver account with id: [{}]", accountDTO.getTargetId());
@@ -251,7 +262,7 @@ public class AccountServiceImpl implements AccountService {
                                                 retrievedOperation.getCommission() > 0 &&
                                                 retrievedOperation.getTime().after(dateFrom) &&
                                                 retrievedOperation.getTime().before(dateTo))
-                .map(retrievedOperation -> operationUtils.operationToOperationCommissionResponseDTO(retrievedOperation));
+                .map(operationUtils::operationToOperationCommissionResponseDTO);
         log.info("Commissions retrieved successfully");
 
         log.info("End of operation to retrieve commissions from account with id: [{}]", id);
@@ -264,7 +275,7 @@ public class AccountServiceImpl implements AccountService {
 
         log.info("Retrieving account balances");
         Flux<AccountFindBalancesResponseDTO> retrievedBalances = findByCustomerId(id)
-                .map(retrievedAccount -> accountUtils.accountToAccountFindBalancesResponseDTO(retrievedAccount));
+                .map(accountUtils::accountToAccountFindBalancesResponseDTO);
         log.info("Balances retrieved successfully");
 
         log.info("End of operation to retrieve account balances from customer with id: [{}]", id);
@@ -292,10 +303,10 @@ public class AccountServiceImpl implements AccountService {
     }
 
     //region Private Helper Functions
-    private Mono<CustomerCustomerServiceResponseDTO> accountToCreateValidation(AccountCreateRequestDTO accountToCreate, CustomerCustomerServiceResponseDTO customerFromMicroservice) {
+    private Mono<CustomerCustomerServiceResponseDTO> accountToCreateGenericValidation(AccountCreateRequestDTO accountToCreate, CustomerCustomerServiceResponseDTO customerFromMicroservice) {
         log.info("Customer exists in database");
 
-        if (customerFromMicroservice.getStatus().contentEquals(constants.getSTATUS_BLOCKED()))
+        if (customerFromMicroservice.getStatus().contentEquals(constants.getStatusBlocked()))
         {
             log.warn("Customer have blocked status");
             log.warn("Proceeding to abort create account");
@@ -308,88 +319,63 @@ public class AccountServiceImpl implements AccountService {
             return Mono.error(new IllegalArgumentException("Account does not contain holders"));
         }
 
-        if (customerFromMicroservice.getCustomerType().getGroup().contentEquals(constants.getCUSTOMER_PERSONAL_GROUP()))
-        {
-            if (customerFromMicroservice.getCustomerType().getSubgroup().contentEquals(constants.getCUSTOMER_PERSONAL_STANDARD_SUBGROUP()) &&
-            accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_SAVINGS_VIP_SUBGROUP())) {
-                log.warn("Standard customers can not create vip accounts");
-                log.warn("Proceeding to abort create account");
-                return Mono.error(new BusinessLogicException("Standard customer can not create vip accounts"));
-            }
+        return Mono.just(customerFromMicroservice);
+    }
 
-            return findByCustomerId(customerFromMicroservice.getId())
-                    .filter(retrievedAccount -> retrievedAccount.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
-                    .hasElements()
-                    .flatMap(haveAnAccount -> {
-                        if (haveAnAccount) {
-                            log.warn("Can not create more than one account for a personal customer");
-                            log.warn("Proceeding to abort create account");
-                            return Mono.error(new BusinessLogicException("Customer have more than one account"));
-                        }
-
-                        if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_SAVINGS_VIP_SUBGROUP())) {
-                            return findCreditsByCustomerIdActiveService(customerFromMicroservice.getId())
-                                    .filter(retrievedCredit -> retrievedCredit.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
-                                    .hasElements()
-                                    .flatMap(haveACredit -> {
-                                        if (!haveACredit) {
-                                            log.warn("Can not create savings vip account because customer does not have a credit product");
-                                            log.warn("Proceeding to abort create account");
-                                            return Mono.error(new BusinessLogicException("Customer does not have a credit product"));
-                                        }
-
-                                        log.info("Account successfully validated");
-                                        return Mono.just(customerFromMicroservice);
-                                    });
-                        } else {
-                            log.info("Account successfully validated");
-                            return Mono.just(customerFromMicroservice);
-                        }
-                    });
-        } else if (customerFromMicroservice.getCustomerType().getGroup().contentEquals(constants.getCUSTOMER_BUSINESS_GROUP())) {
-            if (!accountToCreate.getAccountType().getGroup().contentEquals(constants.getACCOUNT_CURRENT_GROUP()))
-            {
-                log.warn("Can not create {} account for business customers. Accounts must be of current type", accountToCreate.getAccountType().getGroup());
-                log.warn("Proceeding to abort create account");
-                return Mono.error(new BusinessLogicException("Account is not of current type"));
-            }
-
-            if (customerFromMicroservice.getCustomerType().getSubgroup().contentEquals(constants.getCUSTOMER_BUSINESS_STANDARD_SUBGROUP()) &&
-                    accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_CURRENT_PYME_SUBGROUP())) {
-                log.warn("Standard customers can not create pyme accounts");
-                log.warn("Proceeding to abort create account");
-                return Mono.error(new BusinessLogicException("Standard customer can not create pyme accounts"));
-            }
-
-            if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getACCOUNT_CURRENT_PYME_SUBGROUP())) {
-                return findCreditsByCustomerIdActiveService(customerFromMicroservice.getId())
-                        .filter(retrievedCredit -> retrievedCredit.getStatus().contentEquals(constants.getSTATUS_ACTIVE()))
-                        .hasElements()
-                        .flatMap(haveACredit -> {
-                            if (!haveACredit) {
-                                log.warn("Can not create current pyme account because customer does not have a credit product");
-                                log.warn("Proceeding to abort create account");
-                                return Mono.error(new BusinessLogicException("Customer does not have a credit product"));
-                            }
-
-                            log.info("Account successfully validated");
-                            return Mono.just(customerFromMicroservice);
-                        });
-            } else {
-                log.info("Account successfully validated");
-                return Mono.just(customerFromMicroservice);
-            }
-        } else {
-            log.warn("Customer's type is not supported");
+    private Mono<CustomerCustomerServiceResponseDTO> accountToCreatePersonalCustomersValidation(AccountCreateRequestDTO accountToCreate, CustomerCustomerServiceResponseDTO customerFromMicroservice) {
+        if (customerFromMicroservice.getCustomerType().getSubgroup().contentEquals(constants.getCustomerPersonalStandardSubgroup()) &&
+                accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getAccountSavingsVipSubgroup())) {
+            log.warn("Standard customers can not create vip accounts");
             log.warn("Proceeding to abort create account");
-            return Mono.error(new BusinessLogicException("Not supported customer type"));
+            return Mono.error(new BusinessLogicException("Standard customer can not create vip accounts"));
+        }
+
+        return findByCustomerId(customerFromMicroservice.getId())
+                .filter(retrievedAccount -> retrievedAccount.getStatus().contentEquals(constants.getStatusActive()))
+                .hasElements()
+                .flatMap(haveAnAccount -> {
+                    if (Boolean.TRUE.equals(haveAnAccount)) {
+                        log.warn("Can not create more than one account for a personal customer");
+                        log.warn("Proceeding to abort create account");
+                        return Mono.error(new BusinessLogicException("Customer have more than one account"));
+                    }
+
+                    if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getAccountSavingsVipSubgroup())) {
+                        return customerHaveCreditValidation(customerFromMicroservice);
+                    } else {
+                        log.info("Account successfully validated");
+                        return Mono.just(customerFromMicroservice);
+                    }
+                });
+    }
+
+    private Mono<CustomerCustomerServiceResponseDTO> accountToCreateBusinessCustomersValidation(AccountCreateRequestDTO accountToCreate, CustomerCustomerServiceResponseDTO customerFromMicroservice) {
+        if (!accountToCreate.getAccountType().getGroup().contentEquals(constants.getAccountCurrentGroup()))
+        {
+            log.warn("Can not create {} account for business customers. Accounts must be of current type", accountToCreate.getAccountType().getGroup());
+            log.warn("Proceeding to abort create account");
+            return Mono.error(new BusinessLogicException("Account is not of current type"));
+        }
+
+        if (customerFromMicroservice.getCustomerType().getSubgroup().contentEquals(constants.getCustomerBusinessStandardSubgroup()) &&
+                accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getAccountCurrentPymeSubgroup())) {
+            log.warn("Standard customers can not create pyme accounts");
+            log.warn("Proceeding to abort create account");
+            return Mono.error(new BusinessLogicException("Standard customer can not create pyme accounts"));
+        }
+
+        if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getAccountCurrentPymeSubgroup())) {
+            return customerHaveCreditValidation(customerFromMicroservice);
+        } else {
+            log.info("Account successfully validated");
+            return Mono.just(customerFromMicroservice);
         }
     }
 
     private Mono<Account> accountToUpdateValidation(AccountUpdateRequestDTO accountForUpdate, Account accountInDatabase) {
         log.info("Account exists in database");
 
-        if (accountInDatabase.getCustomer().getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
+        if (accountInDatabase.getCustomer().getStatus().contentEquals(constants.getStatusBlocked())) {
             log.warn("Customer have blocked status");
             log.warn("Proceeding to abort update account");
             return Mono.error(new ElementBlockedException("The customer have blocked status"));
@@ -408,14 +394,14 @@ public class AccountServiceImpl implements AccountService {
     private Mono<Account> operationValidation(AccountDoOperationRequestDTO accountToUpdateOperation, Account accountInDatabase) {
         log.info("Account exists in database");
 
-        if (accountInDatabase.getStatus().contentEquals(constants.getSTATUS_BLOCKED())) {
+        if (accountInDatabase.getStatus().contentEquals(constants.getStatusBlocked())) {
             log.warn("Account have blocked status");
             log.warn("Proceeding to abort do operation");
             return Mono.error(new ElementBlockedException("The account have blocked status"));
         }
 
-        if (accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOPERATION_WITHDRAWAL_TYPE()) ||
-                accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_OUT_TYPE())) {
+        if (accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOperationWithdrawalType()) ||
+                accountToUpdateOperation.getOperation().getType().contentEquals(constants.getOperationTransferOutType())) {
 
             Double amountToTake = accountToUpdateOperation.getOperation().getAmount();
             if (accountInDatabase.getAccountSpecifications() != null &&
@@ -433,7 +419,7 @@ public class AccountServiceImpl implements AccountService {
             }
         }
 
-        if (accountInDatabase.getAccountType().getGroup().contentEquals(constants.getACCOUNT_LONG_TERM_GROUP()) &&
+        if (accountInDatabase.getAccountType().getGroup().contentEquals(constants.getAccountLongTermGroup()) &&
             !accountInDatabase.getAccountSpecifications().getAllowedDayForOperations().equals(Calendar.getInstance().get(Calendar.DAY_OF_MONTH))) {
             log.info("Allowed day [{}] for operations in this account does not match with current day of the month [{}]",
                     accountInDatabase.getAccountSpecifications().getAllowedDayForOperations(),
@@ -448,7 +434,7 @@ public class AccountServiceImpl implements AccountService {
 
     private Mono<Account> storeOperationIntoAccount(AccountDoOperationRequestDTO accountDTO, Account accountInDatabase) {
         Double commission = 0.0;
-        if (!accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_IN_TYPE())) {
+        if (!accountDTO.getOperation().getType().contentEquals(constants.getOperationTransferInType())) {
             // Increments the number of done operations
             accountInDatabase.setDoneOperationsInMonth(accountInDatabase.getDoneOperationsInMonth() == null ? 1 : accountInDatabase.getDoneOperationsInMonth() + 1);
 
@@ -462,8 +448,8 @@ public class AccountServiceImpl implements AccountService {
         }
 
         // Calculates the new current balance
-        Double newCurrentBalance = accountSpecificationsUtils.roundDouble((accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_DEPOSIT_TYPE()) ||
-                accountDTO.getOperation().getType().contentEquals(constants.getOPERATION_TRANSFER_IN_TYPE())) ?
+        Double newCurrentBalance = accountSpecificationsUtils.roundDouble((accountDTO.getOperation().getType().contentEquals(constants.getOperationDepositType()) ||
+                accountDTO.getOperation().getType().contentEquals(constants.getOperationTransferInType())) ?
                 accountInDatabase.getCurrentBalance() + accountDTO.getOperation().getAmount() - commission :
                 accountInDatabase.getCurrentBalance() - accountDTO.getOperation().getAmount() - commission, 2);
         accountInDatabase.setCurrentBalance(newCurrentBalance);
@@ -480,6 +466,22 @@ public class AccountServiceImpl implements AccountService {
         accountInDatabase.setOperations(operations);
 
         return Mono.just(accountInDatabase);
+    }
+
+    private Mono<CustomerCustomerServiceResponseDTO> customerHaveCreditValidation(CustomerCustomerServiceResponseDTO customer) {
+        return findCreditsByCustomerIdActiveService(customer.getId())
+                .filter(retrievedCredit -> retrievedCredit.getStatus().contentEquals(constants.getStatusActive()))
+                .hasElements()
+                .flatMap(haveACredit -> {
+                    if (Boolean.FALSE.equals(haveACredit)) {
+                        log.warn("Can not create account because customer does not have a credit product");
+                        log.warn("Proceeding to abort create account");
+                        return Mono.error(new BusinessLogicException("Customer does not have a credit product"));
+                    }
+
+                    log.info("Account successfully validated");
+                    return Mono.just(customer);
+                });
     }
     //endregion
 }
