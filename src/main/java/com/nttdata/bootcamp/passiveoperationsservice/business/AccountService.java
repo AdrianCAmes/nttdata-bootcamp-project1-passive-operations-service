@@ -11,7 +11,6 @@ import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.Customer
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.OperationCommissionResponseDTO;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
 import java.util.Date;
 
 public interface AccountService {
