@@ -262,7 +262,7 @@ public class AccountServiceImpl implements AccountService {
                                                 retrievedOperation.getCommission() > 0 &&
                                                 retrievedOperation.getTime().after(dateFrom) &&
                                                 retrievedOperation.getTime().before(dateTo))
-                .map(retrievedOperation -> operationUtils.operationToOperationCommissionResponseDTO(retrievedOperation));
+                .map(operationUtils::operationToOperationCommissionResponseDTO);
         log.info("Commissions retrieved successfully");
 
         log.info("End of operation to retrieve commissions from account with id: [{}]", id);
@@ -341,7 +341,7 @@ public class AccountServiceImpl implements AccountService {
                     }
 
                     if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getAccountSavingsVipSubgroup())) {
-                        return CustomerHaveCreditValidation(customerFromMicroservice);
+                        return customerHaveCreditValidation(customerFromMicroservice);
                     } else {
                         log.info("Account successfully validated");
                         return Mono.just(customerFromMicroservice);
@@ -365,7 +365,7 @@ public class AccountServiceImpl implements AccountService {
         }
 
         if (accountToCreate.getAccountType().getSubgroup().contentEquals(constants.getAccountCurrentPymeSubgroup())) {
-            return CustomerHaveCreditValidation(customerFromMicroservice);
+            return customerHaveCreditValidation(customerFromMicroservice);
         } else {
             log.info("Account successfully validated");
             return Mono.just(customerFromMicroservice);
@@ -468,12 +468,12 @@ public class AccountServiceImpl implements AccountService {
         return Mono.just(accountInDatabase);
     }
 
-    private Mono<CustomerCustomerServiceResponseDTO> CustomerHaveCreditValidation(CustomerCustomerServiceResponseDTO customer) {
+    private Mono<CustomerCustomerServiceResponseDTO> customerHaveCreditValidation(CustomerCustomerServiceResponseDTO customer) {
         return findCreditsByCustomerIdActiveService(customer.getId())
                 .filter(retrievedCredit -> retrievedCredit.getStatus().contentEquals(constants.getStatusActive()))
                 .hasElements()
                 .flatMap(haveACredit -> {
-                    if (!haveACredit) {
+                    if (Boolean.FALSE.equals(haveACredit)) {
                         log.warn("Can not create account because customer does not have a credit product");
                         log.warn("Proceeding to abort create account");
                         return Mono.error(new BusinessLogicException("Customer does not have a credit product"));
