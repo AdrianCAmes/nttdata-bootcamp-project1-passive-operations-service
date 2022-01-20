@@ -17,9 +17,11 @@ import com.nttdata.bootcamp.passiveoperationsservice.utils.CustomerUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.config.Constants;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.OperationUtils;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.BusinessLogicException;
+import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.CircuitBreakerException;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.ElementBlockedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cloud.client.circuitbreaker.ReactiveCircuitBreaker;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -42,6 +44,8 @@ public class AccountServiceImpl implements AccountService {
     private final OperationUtils operationUtils;
     private final AccountSpecificationsUtils accountSpecificationsUtils;
     private final Constants constants;
+    private final ReactiveCircuitBreaker customersServiceReactiveCircuitBreaker;
+    private final ReactiveCircuitBreaker activesServiceReactiveCircuitBreaker;
 
     @Override
     public Mono<Account> create(AccountCreateRequestDTO accountDTO) {
@@ -154,14 +158,20 @@ public class AccountServiceImpl implements AccountService {
 
         log.info("Retrieving customer");
         String url = constants.getCustomerInfoServiceUrl() + "/api/v1/customers/" + id;
-        Mono<CustomerCustomerServiceResponseDTO> retrievedCustomer = webClientBuilder.build().get()
-                .uri(uriBuilder -> uriBuilder
-                        .host(constants.getGatewayServiceUrl())
-                        .path(url)
-                        .build())
-                .retrieve()
-                .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
-                .bodyToMono(CustomerCustomerServiceResponseDTO.class);
+        Mono<CustomerCustomerServiceResponseDTO> retrievedCustomer = customersServiceReactiveCircuitBreaker.run(
+                webClientBuilder.build().get()
+                        .uri(uriBuilder -> uriBuilder
+                                .host(constants.getGatewayServiceUrl())
+                                .path(url)
+                                .build())
+                        .retrieve()
+                        .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
+                        .bodyToMono(CustomerCustomerServiceResponseDTO.class),
+                throwable -> {
+                    log.warn("Error in circuit breaker call");
+                    log.warn(throwable.getMessage());
+                    return Mono.error(new CircuitBreakerException("Error in circuit breaker"));
+                });
         log.info("Customer retrieved successfully");
 
         log.info("End of operation to retrieve customer with id: [{}]", id);
@@ -174,14 +184,20 @@ public class AccountServiceImpl implements AccountService {
 
         log.info("Retrieving credits");
         String url = constants.getActiveOperationsServiceUrl() + "/api/v1/customers/" + id + "/credits";
-        Flux<CreditActiveServiceResponseDTO> retrievedCredits = webClientBuilder.build().get()
-                .uri(uriBuilder -> uriBuilder
-                        .host(constants.getGatewayServiceUrl())
-                        .path(url)
-                        .build())
-                .retrieve()
-                .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
-                .bodyToFlux(CreditActiveServiceResponseDTO.class);
+        Flux<CreditActiveServiceResponseDTO> retrievedCredits = activesServiceReactiveCircuitBreaker.run(
+                webClientBuilder.build().get()
+                        .uri(uriBuilder -> uriBuilder
+                                .host(constants.getGatewayServiceUrl())
+                                .path(url)
+                                .build())
+                        .retrieve()
+                        .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
+                        .bodyToFlux(CreditActiveServiceResponseDTO.class),
+                throwable -> {
+                    log.warn("Error in circuit breaker call");
+                    log.warn(throwable.getMessage());
+                    return Flux.error(new CircuitBreakerException("Error in circuit breaker"));
+                });
         log.info("Customer retrieved successfully");
 
         log.info("End of operation to retrieve customer with id: [{}]", id);
