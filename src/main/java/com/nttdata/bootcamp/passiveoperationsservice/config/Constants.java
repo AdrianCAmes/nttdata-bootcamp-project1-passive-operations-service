@@ -76,15 +76,15 @@ public class Constants {
     @Value("${constants.operation.transfer-in-type:}")
     private String operationTransferInType;
 
-    @Value("${constants.circuit-breaker.customer-info-service.name:}")
+    @Value("${constants.circuit-breaker.customer-info-service.name:customersDefaultCircuitBreaker}")
     private String customersServiceCircuitBreakerName;
 
-    @Value("${constants.circuit-breaker.customer-info-service.timeout:}")
+    @Value("${constants.circuit-breaker.customer-info-service.timeout:2}")
     private Integer customersServiceCircuitBreakerTimeout;
 
-    @Value("${constants.circuit-breaker.active-operations-service.name:}")
+    @Value("${constants.circuit-breaker.active-operations-service.name:activesDefaultCircuitBreaker}")
     private String activesServiceCircuitBreakerName;
 
-    @Value("${constants.circuit-breaker.active-operations-service.timeout:}")
+    @Value("${constants.circuit-breaker.active-operations-service.timeout:2}")
     private Integer activesServiceCircuitBreakerTimeout;
 }
