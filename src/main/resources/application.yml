@@ -3,8 +3,8 @@ spring:
     name: passive-operations-service
   cloud:
     config:
-      uri: http://localhost:8888
+      uri: http://20.83.138.240:8888
       username: root
       password: p1a2s3s
   config:
-    import: optional:configserver:http://localhost:8888
+    import: optional:configserver:http://20.83.138.240:8888
