@@ -11,6 +11,7 @@ import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CreditAc
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.CustomerCustomerServiceResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.model.dto.response.OperationCommissionResponseDTO;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.BusinessLogicException;
+import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.CircuitBreakerException;
 import com.nttdata.bootcamp.passiveoperationsservice.utils.errorhandling.ElementBlockedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
 import java.util.Date;
 import java.util.NoSuchElementException;
 
@@ -57,6 +59,7 @@ public class AccountController {
                 .onErrorResume(IllegalArgumentException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).build()))
                 .onErrorResume(NoSuchElementException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).build()))
                 .onErrorResume(NullPointerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()))
+                .onErrorResume(CircuitBreakerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).build()))
                 .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(null)));
     }
 
@@ -89,15 +92,18 @@ public class AccountController {
     }
 
     @GetMapping("customers-service/{id}")
-    public Mono<CustomerCustomerServiceResponseDTO> findByIdCustomerService(@PathVariable("id") String id) {
+    public Mono<ResponseEntity<CustomerCustomerServiceResponseDTO>> findByIdCustomerService(@PathVariable("id") String id) {
         log.info("Get operation in /customers-service/{}", id);
-        return accountService.findByIdCustomerService(id);
+        return accountService.findByIdCustomerService(id)
+                .flatMap(retrievedCustomer -> Mono.just(ResponseEntity.ok(retrievedCustomer)))
+                .onErrorResume(CircuitBreakerException.class, error -> Mono.just(ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).build()));
     }
 
     @GetMapping("active-service/customers/{id}/credits")
     public Flux<CreditActiveServiceResponseDTO> findCreditsByCustomerIdActiveService(@PathVariable("id") String id) {
         log.info("Get operation in /customers-service/{}", id);
-        return accountService.findCreditsByCustomerIdActiveService(id);
+        return accountService.findCreditsByCustomerIdActiveService(id)
+                .onErrorResume(CircuitBreakerException.class, error -> Flux.empty());
     }
     //endregion
 
