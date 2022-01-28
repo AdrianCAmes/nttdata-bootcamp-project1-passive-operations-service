@@ -6,6 +6,7 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @ToString
 public class BillingDetailsActiveServiceResponseDTO {
     private Double interestPercentage;

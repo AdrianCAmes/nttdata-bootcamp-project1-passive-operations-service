@@ -21,6 +21,9 @@
 		<checkstyle.plugin.version>3.1.2</checkstyle.plugin.version>
 		<sonar.organization>adriancames</sonar.organization>
 		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+		<jacoco.plugin.version>0.8.6</jacoco.plugin.version>
+		<spotbugs.plugin.version>4.2.0</spotbugs.plugin.version>
+		<okhttp3.version>4.2.2</okhttp3.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -67,6 +70,17 @@
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-circuitbreaker-reactor-resilience4j</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>mockwebserver</artifactId>
+			<version>${okhttp3.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.google.code.gson</groupId>
+			<artifactId>gson</artifactId>
+			<version>2.8.9</version>
 		</dependency>
 	</dependencies>
 	<dependencyManagement>
@@ -133,6 +147,60 @@
 					</execution>
 				</executions>
 			</plugin>
+
+			<!-- Static code analyse -->
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>${spotbugs.plugin.version}</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>check</goal>
+							<goal>gui</goal>
+							<goal>help</goal>
+							<goal>spotbugs</goal>
+						</goals>
+						<id>check</id>
+					</execution>
+				</executions>
+				<configuration>
+					<excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>
+				</configuration>
+			</plugin>
+
+			<!-- Code coverage -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.plugin.version}</version>
+				<configuration>
+					<destFile>${project.basedir}/target/jacoco.exec</destFile>
+					<append>true</append>
+					<excludes>
+						<exclude>com/nttdata/bootcamp/*/*.class</exclude>
+						<exclude>com/nttdata/bootcamp/*/model/**</exclude>
+						<exclude>com/nttdata/bootcamp/*/config/*</exclude>
+						<exclude>com/nttdata/bootcamp/*/utils/**</exclude>
+					</excludes>
+				</configuration>
+				<executions>
+					<execution>
+						<id>jacoco-initialize</id>
+						<phase>initialize</phase>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 	<reporting>
@@ -147,6 +215,42 @@
 					<consoleOutput>true</consoleOutput>
 					<failsOnError>true</failsOnError>
 					<linkXRef>false</linkXRef>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-pmd-plugin</artifactId>
+				<version>${maven-pmd-plugin.version}</version>
+				<configuration>
+					<skipEmptyReport>false</skipEmptyReport>
+					<excludes>
+						<exclude>com/nttdata/bootcamp/*/*.class</exclude>
+						<exclude>com/nttdata/bootcamp/*/model/**</exclude>
+						<exclude>com/nttdata/bootcamp/*/config/*</exclude>
+						<exclude>com/nttdata/bootcamp/*/utils/**</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>com.github.spotbugs</groupId>
+				<artifactId>spotbugs-maven-plugin</artifactId>
+				<version>${spotbugs.plugin.version}</version>
+			</plugin>
+
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.plugin.version}</version>
+				<configuration>
+					<destFile>${project.basedir}/target/jacoco.exec</destFile>
+					<append>true</append>
+					<excludes>
+						<exclude>com/nttdata/bootcamp/*/*.class</exclude>
+						<exclude>com/nttdata/bootcamp/*/model/**</exclude>
+						<exclude>com/nttdata/bootcamp/*/config/*</exclude>
+						<exclude>com/nttdata/bootcamp/*/utils/**</exclude>
+					</excludes>
 				</configuration>
 			</plugin>
 		</plugins>

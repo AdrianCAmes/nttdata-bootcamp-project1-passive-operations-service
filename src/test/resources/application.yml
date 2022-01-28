@@ -1,0 +1,64 @@
+# Server config
+server:
+  port: 80
+
+# Spring config
+spring:
+  cloud:
+    config:
+      enabled: false
+
+# Eureka config
+eureka:
+  client:
+    registerWithEureka: false
+    fetchRegistry: false
+
+# Constants
+constants:
+  circuit-breaker:
+    customer-info-service:
+      name: mockCustomerInfoServiceName
+      timeout: 10
+    active-operations-service:
+      name: mockActiveOperationsServiceName
+      timeout: 10
+  status:
+    blocked: mockBlocked
+    active: mockActive
+  account:
+    current-group:
+      name: mockAccountCurrentGroupName
+      subgroup:
+        standard: mockAccountCurrentStandardSubgroup
+        pyme: mockAccountCurrentPYMESubgroup
+    savings-group:
+      name: mockAccountSavingsGroupName
+      subgroup:
+        standard: mockAccountSavingsStandardSubgroup
+        vip: mockAccountSavingsVIPSubgroup
+    long-term-group:
+      name: mockAccountLongTermGroupName
+      subgroup:
+        standard: mockAccountLongTermStandardSubgroup
+  customer:
+    personal-group:
+      name: mockCustomerPersonalGroupName
+      subgroup:
+        standard: mockCustomerPersonalStandardSubgroup
+        vip: mockCustomerPersonalVIPSubgroup
+    business-group:
+      name: mockCustomerBusinessGroupName
+      subgroup:
+        standard: mockCustomerBusinessStandardSubgroup
+        pyme: mockCustomerBusinessPYMESubgroup
+  operation:
+    deposit-type: mockOperationDepositType
+    withdrawal-type: mockOperationWithdrawalType
+    transfer-in-type: mockOperationTransferInType
+    transfer-out-type: mockOperationTransferOutType
+  eureka:
+    service-url:
+      gateway-service: localhost
+      customer-info-service: mockCustomerInfoServiceUrl
+      active-operations-service: mockActiveOperationsServiceUrl
