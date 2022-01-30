@@ -1,6 +1,6 @@
 # Server config
 server:
-  port: 80
+  port: 2000
 
 # Spring config
 spring:
@@ -59,6 +59,7 @@ constants:
     transfer-out-type: mockOperationTransferOutType
   eureka:
     service-url:
-      gateway-service: localhost
+      prefix:
+      gateway-service: localhost:${server.port}
       customer-info-service: mockCustomerInfoServiceUrl
       active-operations-service: mockActiveOperationsServiceUrl
