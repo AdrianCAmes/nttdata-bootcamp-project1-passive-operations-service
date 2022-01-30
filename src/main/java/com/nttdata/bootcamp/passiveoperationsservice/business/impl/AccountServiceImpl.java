@@ -157,13 +157,10 @@ public class AccountServiceImpl implements AccountService {
         log.info("Start of operation to retrieve customer with id [{}] from customer-info-service", id);
 
         log.info("Retrieving customer");
-        String url = constants.getCustomerInfoServiceUrl() + "/api/v1/customers/" + id;
+        String url = constants.getUrlPrefix() + constants.getGatewayServiceUrl() + "/" + constants.getCustomerInfoServiceUrl() + "/api/v1/customers/" + id;
         Mono<CustomerCustomerServiceResponseDTO> retrievedCustomer = customersServiceReactiveCircuitBreaker.run(
                 webClientBuilder.build().get()
-                        .uri(uriBuilder -> uriBuilder
-                                .host(constants.getGatewayServiceUrl())
-                                .path(url)
-                                .build())
+                        .uri(url)
                         .retrieve()
                         .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
                         .bodyToMono(CustomerCustomerServiceResponseDTO.class),
@@ -183,13 +180,10 @@ public class AccountServiceImpl implements AccountService {
         log.info("Start of operation to retrieve credits of customer with id [{}] from active-operation-service", id);
 
         log.info("Retrieving credits");
-        String url = constants.getActiveOperationsServiceUrl() + "/api/v1/customers/" + id + "/credits";
+        String url = constants.getUrlPrefix() + constants.getGatewayServiceUrl() + "/" + constants.getActiveOperationsServiceUrl() + "/api/v1/customers/" + id + "/credits";
         Flux<CreditActiveServiceResponseDTO> retrievedCredits = activesServiceReactiveCircuitBreaker.run(
                 webClientBuilder.build().get()
-                        .uri(uriBuilder -> uriBuilder
-                                .host(constants.getGatewayServiceUrl())
-                                .path(url)
-                                .build())
+                        .uri(url)
                         .retrieve()
                         .onStatus(httpStatus -> httpStatus == HttpStatus.NOT_FOUND, clientResponse -> Mono.empty())
                         .bodyToFlux(CreditActiveServiceResponseDTO.class),
