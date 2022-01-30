@@ -21,9 +21,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Response;
 import java.util.Date;
 import java.util.NoSuchElementException;
 
@@ -101,7 +98,7 @@ public class AccountController {
 
     @GetMapping("active-service/customers/{id}/credits")
     public Flux<CreditActiveServiceResponseDTO> findCreditsByCustomerIdActiveService(@PathVariable("id") String id) {
-        log.info("Get operation in /customers-service/{}", id);
+        log.info("Get operation in active-service/customers/{}/credits", id);
         return accountService.findCreditsByCustomerIdActiveService(id)
                 .onErrorResume(CircuitBreakerException.class, error -> Flux.empty());
     }

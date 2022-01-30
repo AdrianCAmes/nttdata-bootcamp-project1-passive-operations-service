@@ -8,6 +8,7 @@ import java.util.ArrayList;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @ToString
 public class BusinessDetailsCustomerServiceResponseDTO {
     private String name;

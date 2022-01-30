@@ -8,6 +8,7 @@ import java.util.Date;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @ToString
 public class PersonDetailsCustomerServiceResponseDTO {
     private String name;
