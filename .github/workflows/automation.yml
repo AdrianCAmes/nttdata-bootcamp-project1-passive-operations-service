@@ -82,3 +82,4 @@ jobs:
         with:
           config: ${{ secrets.KUBE_CONFIG_DATA }}
           command: rollout status deployment/passive-operations-service
+        
